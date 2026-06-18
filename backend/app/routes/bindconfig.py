@@ -47,6 +47,15 @@ DEFAULT_ACL = {
 }
 
 
+def _parse_forwarders_from_options(content: str) -> list:
+    """Extrai IPs do bloco forwarders { ... } de named.conf.options."""
+    m = re.search(r'forwarders\s*\{([^}]*)\}', content, re.DOTALL)
+    if not m:
+        return []
+    block = m.group(1)
+    return re.findall(r'([\da-fA-F:\.]+(?:/\d+)?)\s*;', block)
+
+
 def _load_acl() -> dict:
     if ACL_FILE.exists():
         try:
@@ -207,12 +216,21 @@ class SaveOptions(BaseModel):
 
 @router.put("/options")
 async def save_options(data: SaveOptions, user=Depends(require_admin)):
+    backup = OPT_CONF.read_text() if OPT_CONF.exists() else ""
     OPT_CONF.write_text(data.content)
     res = await _run(["named-checkconf", str(CONF_DIR / "named.conf")])
     if not res["ok"]:
-        # Reverte
-        OPT_CONF.write_text(data.content)
+        OPT_CONF.write_text(backup)
         raise HTTPException(400, f"Erro de sintaxe: {res['output']}")
+    # Sincroniza forwarders de volta ao natverk-acl.json
+    try:
+        fwds = _parse_forwarders_from_options(data.content)
+        if fwds:
+            acl = _load_acl()
+            acl["forwarders"] = fwds
+            ACL_FILE.write_text(json.dumps(acl, indent=2))
+    except Exception:
+        pass
     await _rndc("reconfig")
     return {"ok": True, "output": "Opções salvas e BIND recarregado."}
 
