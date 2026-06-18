@@ -462,10 +462,9 @@ function AdvancedEditor() {
       />
       <CollapsibleFile
         title="named.conf.bloqueios"
-        description="Zonas de bloqueio — gerado automaticamente pela tela de Bloqueios"
+        description="Zonas de bloqueio — editável. Atenção: a tela de Bloqueios sobrescreve este arquivo automaticamente ao adicionar/remover domínios."
         fetchFn={api.getBindBloqueios}
-        saveFn={null}
-        readOnly
+        saveFn={content => api.saveBindBloqueios(content)}
       />
     </div>
   )

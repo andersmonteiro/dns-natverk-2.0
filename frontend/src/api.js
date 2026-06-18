@@ -125,6 +125,8 @@ export const api = {
   checkBindConf:   () => request('/bindconfig/check', { method: 'POST' }),
 
   // ACL / Configurações estruturadas
-  getAcl:  () => request('/bindconfig/acl'),
-  saveAcl: (data) => request('/bindconfig/acl', { method: 'PUT', body: JSON.stringify(data) }),
+  getAcl:          () => request('/bindconfig/acl'),
+  saveAcl:         (data) => request('/bindconfig/acl', { method: 'PUT', body: JSON.stringify(data) }),
+  getBindBloqueios:  () => request('/bindconfig/bloqueios'),
+  saveBindBloqueios: (content) => request('/bindconfig/bloqueios', { method: 'PUT', body: JSON.stringify({ content }) }),
 }

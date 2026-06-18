@@ -492,6 +492,32 @@ async def check_config(user=Depends(require_admin)):
     return res
 
 
+# ── named.conf.bloqueios ─────────────────────────────────────────────────────
+
+@router.get("/bloqueios")
+async def get_bloqueios(user=Depends(get_current_user)):
+    f = CONF_DIR / "named.conf.bloqueios"
+    if not f.exists():
+        return {"content": "", "exists": False}
+    return {"content": f.read_text(errors="replace"), "exists": True}
+
+
+class SaveBloqueios(BaseModel):
+    content: str
+
+@router.put("/bloqueios")
+async def save_bloqueios(data: SaveBloqueios, user=Depends(require_admin)):
+    bloq = CONF_DIR / "named.conf.bloqueios"
+    backup = bloq.read_text() if bloq.exists() else ""
+    bloq.write_text(data.content)
+    res = await _run(["named-checkconf", str(CONF_DIR / "named.conf")])
+    if not res["ok"]:
+        bloq.write_text(backup)
+        raise HTTPException(400, f"Erro de sintaxe: {res['output']}")
+    await _rndc("reconfig")
+    return {"ok": True, "output": "named.conf.bloqueios salvo e BIND recarregado."}
+
+
 # ── ACL / Configurações estruturadas ─────────────────────────────────────────
 
 @router.get("/acl")
