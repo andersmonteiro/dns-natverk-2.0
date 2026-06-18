@@ -234,16 +234,33 @@ function AclEditor() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
             <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>IPv4</label>
-            <input value={ipv4} onChange={e => setIpv4(e.target.value)}
-              placeholder="ex: 177.130.50.42  (vazio = any)" style={input} />
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input value={ipv4} onChange={e => setIpv4(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && e.preventDefault()}
+                placeholder="ex: 177.130.50.42  (vazio = any)"
+                style={{ ...input, flex: 1 }} />
+              {ipv4.trim() && (
+                <button onClick={() => setIpv4('')} style={{ ...btn('ghost'), padding: '7px 10px', fontSize: 14 }}>×</button>
+              )}
+            </div>
           </div>
           <div>
             <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
               IPv6 <span style={{ opacity: .5 }}>(opcional)</span>
             </label>
-            <input value={ipv6} onChange={e => setIpv6(e.target.value)}
-              placeholder="ex: 2804:235c::1" style={input} />
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input value={ipv6} onChange={e => setIpv6(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && e.preventDefault()}
+                placeholder="ex: 2804:235c::1"
+                style={{ ...input, flex: 1 }} />
+              {ipv6.trim() && (
+                <button onClick={() => setIpv6('')} style={{ ...btn('ghost'), padding: '7px 10px', fontSize: 14 }}>×</button>
+              )}
+            </div>
           </div>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+          Deixe em branco para escutar em todas as interfaces (any).
         </div>
       </div>
 
@@ -299,11 +316,18 @@ function CollapsibleFile({ title, description, fetchFn, saveFn, readOnly = false
   const [saving, setSaving]   = useState(false)
   const [status, setStatus]   = useState(null)
 
+  const [loadError, setLoadError] = useState(null)
+
   async function load() {
     if (loaded) return
-    const r = await fetchFn()
-    setContent(r.content || '')
-    setLoaded(true)
+    try {
+      const r = await fetchFn()
+      setContent(r.content || '')
+      setLoaded(true)
+    } catch (e) {
+      setLoadError(e.message || 'Erro ao carregar arquivo')
+      setLoaded(true)
+    }
   }
 
   function toggle() {
@@ -349,6 +373,8 @@ function CollapsibleFile({ title, description, fetchFn, saveFn, readOnly = false
         <div style={{ padding: 16, background: 'var(--bg-canvas)' }}>
           {!loaded
             ? <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Carregando…</div>
+            : loadError
+            ? <div style={{ color: 'var(--red)', fontSize: 13 }}>Erro: {loadError}</div>
             : <>
                 <TextEditor value={content} onChange={setContent} height={360} readOnly={readOnly} />
                 {!readOnly && (
