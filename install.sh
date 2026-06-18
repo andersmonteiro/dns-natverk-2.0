@@ -109,12 +109,51 @@ else
   warn "Certificado já existe — mantendo."
 fi
 
-# ── 6. Sobe os containers ─────────────────────────────────────────────────────
+# ── 6. Querylog do BIND9 ──────────────────────────────────────────────────────
+NAMED_CONF="/etc/bind/named.conf"
+LOG_DIR="/var/log/named"
+LOG_FILE="$LOG_DIR/queries.log"
+
+if [ -f "$NAMED_CONF" ]; then
+  if grep -q "dns-natverk-querylog" "$NAMED_CONF" 2>/dev/null; then
+    warn "Querylog já configurado no named.conf — mantendo."
+  else
+    info "Configurando querylog do BIND9..."
+    mkdir -p "$LOG_DIR"
+    chown bind:bind "$LOG_DIR" 2>/dev/null || true
+    chmod 755 "$LOG_DIR"
+
+    cat >> "$NAMED_CONF" << 'EOF'
+
+# dns-natverk-querylog — adicionado pelo instalador
+logging {
+    channel natverk_query_log {
+        file "/var/log/named/queries.log" versions 5 size 20m;
+        severity dynamic;
+        print-time yes;
+        print-category yes;
+    };
+    category queries { natverk_query_log; };
+};
+EOF
+
+    # Recarrega BIND se estiver rodando
+    if systemctl is-active --quiet bind9 2>/dev/null || systemctl is-active --quiet named 2>/dev/null; then
+      rndc reconfig 2>/dev/null && success "BIND recarregado com querylog ativo." || warn "Não foi possível recarregar BIND automaticamente. Reinicie manualmente."
+    else
+      warn "BIND não está rodando — querylog será ativado no próximo início."
+    fi
+  fi
+else
+  warn "named.conf não encontrado em $NAMED_CONF — querylog não configurado."
+fi
+
+# ── 7. Sobe os containers ─────────────────────────────────────────────────────
 info "Construindo e subindo os containers (modo produção)..."
 make prod-build
 success "Containers no ar."
 
-# ── 7. Resumo ─────────────────────────────────────────────────────────────────
+# ── 8. Resumo ─────────────────────────────────────────────────────────────────
 IP=$(hostname -I | awk '{print $1}')
 echo ""
 echo -e "${BOLD}${GREEN}╔══════════════════════════════════════════╗${NC}"
@@ -122,10 +161,4 @@ echo -e "${BOLD}${GREEN}║        Instalação concluída!             ║${NC}
 echo -e "${BOLD}${GREEN}╚══════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  ${BOLD}Acesse:${NC}    https://$IP"
-echo ""
-echo -e "  ${BOLD}Instalar em outro servidor:${NC}"
-echo -e "  curl -fsSL https://raw.githubusercontent.com/andersmonteiro/dns-natverk-2.0/main/install.sh | bash"
-echo ""
-echo -e "  ${BOLD}Atualizar este servidor:${NC}"
-echo -e "  cd $INSTALL_DIR && bash install.sh"
 echo ""
