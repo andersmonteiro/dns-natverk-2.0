@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Activity, Terminal, ShieldOff, ShieldCheck,
   ClipboardList, Users, Wrench, HardDrive, FileText, UserCircle,
-  LogOut, Sun, Moon, RefreshCw, ChevronDown,
+  LogOut, Sun, Moon, RefreshCw, ChevronDown, Server,
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { clearToken } from '../api'
@@ -17,6 +17,7 @@ const navItems = [
   { to: '/blocklist',  icon: ShieldOff,         label: 'Bloqueios' },
   { to: '/whitelist',  icon: ShieldCheck,       label: 'Whitelist' },
   { to: '/tools',      icon: Wrench,            label: 'Ferramentas' },
+  { to: '/bindconfig', icon: Server,             label: 'Config BIND' },
   { to: '/bindlog',    icon: FileText,           label: 'Log BIND' },
   { to: '/backups',    icon: HardDrive,          label: 'Backups' },
   { to: '/users',      icon: Users,             label: 'Usuários' },

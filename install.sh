@@ -109,44 +109,40 @@ else
   warn "Certificado já existe — mantendo."
 fi
 
-# ── 6. Querylog do BIND9 ──────────────────────────────────────────────────────
-NAMED_CONF="/etc/bind/named.conf"
-LOG_DIR="/var/log/named"
-LOG_FILE="$LOG_DIR/queries.log"
+# ── 6. Porta 53 — libera para o container BIND ───────────────────────────────
+info "Verificando se a porta 53 está disponível..."
 
-if [ -f "$NAMED_CONF" ]; then
-  if grep -q "dns-natverk-querylog" "$NAMED_CONF" 2>/dev/null; then
-    warn "Querylog já configurado no named.conf — mantendo."
-  else
-    info "Configurando querylog do BIND9..."
-    mkdir -p "$LOG_DIR"
-    chown bind:bind "$LOG_DIR" 2>/dev/null || true
-    chmod 755 "$LOG_DIR"
-
-    cat >> "$NAMED_CONF" << 'EOF'
-
-# dns-natverk-querylog — adicionado pelo instalador
-logging {
-    channel natverk_query_log {
-        file "/var/log/named/queries.log" versions 5 size 20m;
-        severity dynamic;
-        print-time yes;
-        print-category yes;
-    };
-    category queries { natverk_query_log; };
-};
-EOF
-
-    # Recarrega BIND se estiver rodando
-    if systemctl is-active --quiet bind9 2>/dev/null || systemctl is-active --quiet named 2>/dev/null; then
-      rndc reconfig 2>/dev/null && success "BIND recarregado com querylog ativo." || warn "Não foi possível recarregar BIND automaticamente. Reinicie manualmente."
-    else
-      warn "BIND não está rodando — querylog será ativado no próximo início."
-    fi
+# systemd-resolved ocupa 53 em muitas distros Debian/Ubuntu modernas
+if systemctl is-active --quiet systemd-resolved 2>/dev/null; then
+  warn "systemd-resolved está ocupando a porta 53. Desativando..."
+  systemctl disable --now systemd-resolved
+  # Mantém resolução de DNS funcional via /etc/resolv.conf estático
+  if [ ! -f /etc/resolv.conf.bak ]; then
+    cp /etc/resolv.conf /etc/resolv.conf.bak 2>/dev/null || true
   fi
-else
-  warn "named.conf não encontrado em $NAMED_CONF — querylog não configurado."
+  rm -f /etc/resolv.conf
+  echo "nameserver 8.8.8.8" > /etc/resolv.conf
+  echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+  success "systemd-resolved desativado. /etc/resolv.conf ajustado."
 fi
+
+# Verifica se porta 53 UDP ainda está em uso
+if ss -ulnp 2>/dev/null | grep -q ':53 ' || netstat -ulnp 2>/dev/null | grep -q ':53 '; then
+  warn "Algo ainda está usando a porta 53 UDP. O container BIND pode falhar ao subir."
+  warn "Verifique: ss -ulnp | grep :53"
+else
+  success "Porta 53 disponível."
+fi
+
+# ── 7. Para BIND no host se ainda estiver rodando ────────────────────────────
+# (agora o BIND roda em container — evita conflito na porta 53)
+for svc in bind9 named; do
+  if systemctl is-active --quiet "$svc" 2>/dev/null; then
+    warn "Serviço '$svc' rodando no host. Parando para ceder a porta 53 ao container..."
+    systemctl disable --now "$svc" 2>/dev/null || true
+    success "$svc desativado no host."
+  fi
+done
 
 # ── 7. Sobe os containers ─────────────────────────────────────────────────────
 info "Construindo e subindo os containers (modo produção)..."

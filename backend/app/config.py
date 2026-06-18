@@ -8,8 +8,14 @@ class Settings(BaseSettings):
 
     bind_log_path: str = "/var/log/named/queries.log"
     rndc_path: str = "/usr/sbin/rndc"
-    rndc_host: str = "127.0.0.1"  # prod: 127.0.0.1 (host network). dev: host.docker.internal
+    rndc_host: str = "bind"          # nome do serviço Docker
+    rndc_key_file: str = "/etc/bind/rndc.key"
+    rndc_port: int = 953
     collector_enabled: bool = True
+
+    # Diretórios do BIND (volumes compartilhados)
+    bind_conf_dir: str = "/etc/bind"
+    bind_zones_dir: str = "/etc/bind/zones"
 
     class Config:
         env_file = ".env"

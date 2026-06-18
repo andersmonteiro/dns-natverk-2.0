@@ -1,23 +1,33 @@
 services:
+
+  bind:
+    build: ./bind
+    restart: unless-stopped
+    ports:
+      - "${DNS_PORT_UDP:-53}:53/udp"
+      - "${DNS_PORT_TCP:-53}:53/tcp"
+    volumes:
+      - bind_etc:/etc/bind        # config (compartilhado com backend)
+      - bind_cache:/var/cache/bind
+      - bind_log:/var/log/named   # logs (compartilhado com backend)
+
   backend:
     build: ./backend
     restart: unless-stopped
-    privileged: true
-    pid: host
+    depends_on:
+      - bind
     volumes:
       - dns_data:/data
-      - /var/log/named:/var/log/named:ro
-      - /etc/bind:/etc/bind:ro
-      - /var/cache/bind:/var/cache/bind:ro
+      - bind_etc:/etc/bind        # lê/escreve config do BIND
+      - bind_log:/var/log/named:ro  # lê logs
     environment:
       - DATABASE_URL=sqlite:////data/dns_panel.db
       - SECRET_KEY=${SECRET_KEY:-changeme-please-set-in-env}
       - BIND_LOG_PATH=${BIND_LOG_PATH:-/var/log/named/queries.log}
       - RNDC_PATH=${RNDC_PATH:-/usr/sbin/rndc}
-      - RNDC_HOST=${RNDC_HOST:-host.docker.internal}
+      - RNDC_HOST=${RNDC_HOST:-bind}
+      - RNDC_KEY_FILE=${RNDC_KEY_FILE:-/etc/bind/rndc.key}
       - COLLECTOR_ENABLED=${COLLECTOR_ENABLED:-true}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
   frontend:
     build: ./frontend
@@ -38,3 +48,6 @@ services:
 
 volumes:
   dns_data:
+  bind_etc:
+  bind_cache:
+  bind_log:

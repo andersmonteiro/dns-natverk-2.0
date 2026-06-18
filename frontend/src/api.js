@@ -108,4 +108,19 @@ export const api = {
 
   // Restart BIND
   restartBind: () => request('/ops/bind/restart', { method: 'POST' }),
+
+  // BIND Config
+  getBindOptions:  () => request('/bindconfig/options'),
+  saveBindOptions: (content) => request('/bindconfig/options', { method: 'PUT', body: JSON.stringify({ content }) }),
+  getBindLocal:    () => request('/bindconfig/local'),
+  saveBindLocal:   (content) => request('/bindconfig/local', { method: 'PUT', body: JSON.stringify({ content }) }),
+  getZones:        () => request('/bindconfig/zones'),
+  createZone:      (data) => request('/bindconfig/zones', { method: 'POST', body: JSON.stringify(data) }),
+  deleteZone:      (name) => request(`/bindconfig/zones/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  getZoneRecords:  (name) => request(`/bindconfig/zones/${encodeURIComponent(name)}/records`),
+  getZoneFile:     (name) => request(`/bindconfig/zones/${encodeURIComponent(name)}/file`),
+  saveZoneFile:    (name, content) => request(`/bindconfig/zones/${encodeURIComponent(name)}/file`, { method: 'PUT', body: JSON.stringify({ content }) }),
+  addRecord:       (zone, data) => request(`/bindconfig/zones/${encodeURIComponent(zone)}/records`, { method: 'POST', body: JSON.stringify(data) }),
+  deleteRecord:    (zone, record_line) => request(`/bindconfig/zones/${encodeURIComponent(zone)}/records`, { method: 'DELETE', body: JSON.stringify({ record_line }) }),
+  checkBindConf:   () => request('/bindconfig/check', { method: 'POST' }),
 }

@@ -1,19 +1,17 @@
-# Overlay para produção em servidores Debian com BIND9 instalado no host.
-# Uso: make prod  ou  make prod-build
+# Overlay de produção — não precisa mais de host network
+# BIND expõe porta 53 via port mapping, nginx expõe 80/443
+# Use: make prod  ou  make prod-build
 
 services:
-  backend:
-    network_mode: host
-    extra_hosts: []
+  bind:
     environment:
-      - RNDC_HOST=127.0.0.1
+      - RNDC_HOST=bind
 
-  frontend:
-    network_mode: host
+  backend:
+    environment:
+      - RNDC_HOST=bind
 
   nginx:
-    network_mode: host
-    ports: []
     volumes:
       - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/certs:/etc/nginx/certs:ro

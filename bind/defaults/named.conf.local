@@ -1,0 +1,8 @@
+// named.conf.local — Zonas locais
+// Gerencie suas zonas aqui ou via painel DNS Nätverk.
+
+// Exemplo:
+// zone "exemplo.com.br" {
+//     type master;
+//     file "/etc/bind/zones/exemplo.com.br.zone";
+// };

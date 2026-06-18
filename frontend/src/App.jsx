@@ -14,6 +14,7 @@ import Tools from './pages/Tools'
 import Backups from './pages/Backups'
 import BindLog from './pages/BindLog'
 import Profile from './pages/Profile'
+import BindConfig from './pages/BindConfig'
 
 function PrivateRoute({ children }) {
   const token = localStorage.getItem('dns_panel_token')
@@ -42,6 +43,7 @@ function AppRoutes() {
         <Route path="backups"    element={<Backups    key={k} />} />
         <Route path="bindlog"    element={<BindLog    key={k} />} />
         <Route path="profile"    element={<Profile    key={k} />} />
+        <Route path="bindconfig" element={<BindConfig key={k} />} />
       </Route>
     </Routes>
   )
