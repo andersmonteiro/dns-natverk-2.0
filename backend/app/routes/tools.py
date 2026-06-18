@@ -75,7 +75,7 @@ async def traceroute(data: ToolRequest, user=Depends(get_current_user)):
 async def mtr(data: ToolRequest, user=Depends(get_current_user)):
     host = _validate_host(data.host)
     return await _host_net(
-        ["mtr", "--report", "--report-wide", "--report-cycles", "5", "--no-dns", host],
+        ["mtr", "--report", "--report-wide", "--report-cycles", "5", host],
         timeout=60,
     )
 

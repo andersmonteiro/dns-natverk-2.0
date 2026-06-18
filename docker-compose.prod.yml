@@ -5,6 +5,8 @@ services:
   backend:
     network_mode: host
     extra_hosts: []
+    environment:
+      - RNDC_HOST=127.0.0.1
 
   frontend:
     network_mode: host

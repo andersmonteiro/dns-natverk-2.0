@@ -8,6 +8,7 @@ class Settings(BaseSettings):
 
     bind_log_path: str = "/var/log/named/queries.log"
     rndc_path: str = "/usr/sbin/rndc"
+    rndc_host: str = "127.0.0.1"  # prod: 127.0.0.1 (host network). dev: host.docker.internal
     collector_enabled: bool = True
 
     class Config:

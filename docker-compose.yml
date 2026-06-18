@@ -14,6 +14,7 @@ services:
       - SECRET_KEY=${SECRET_KEY:-changeme-please-set-in-env}
       - BIND_LOG_PATH=${BIND_LOG_PATH:-/var/log/named/queries.log}
       - RNDC_PATH=${RNDC_PATH:-/usr/sbin/rndc}
+      - RNDC_HOST=${RNDC_HOST:-host.docker.internal}
       - COLLECTOR_ENABLED=${COLLECTOR_ENABLED:-true}
     extra_hosts:
       - "host.docker.internal:host-gateway"

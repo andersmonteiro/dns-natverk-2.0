@@ -5,8 +5,6 @@ from ..config import settings
 
 router = APIRouter(prefix="/api/ops", tags=["ops"])
 
-# Bridge network: usa host.docker.internal (mapeado via extra_hosts no compose)
-BIND_HOST = "host.docker.internal"
 
 
 async def _run(cmd: list, timeout: int = 15) -> dict:
@@ -31,7 +29,7 @@ async def _run(cmd: list, timeout: int = 15) -> dict:
 
 async def _rndc(subcmd: str, timeout: int = 10) -> dict:
     """Executa rndc apontando para o host (onde o BIND está rodando)."""
-    cmd = [settings.rndc_path, "-s", BIND_HOST] + subcmd.split()
+    cmd = [settings.rndc_path, "-s", settings.rndc_host] + subcmd.split()
     res = await _run(cmd, timeout)
     if not res["ok"] and not res["output"]:
         res["output"] = "rndc falhou sem mensagem de erro"
