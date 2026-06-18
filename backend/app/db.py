@@ -79,7 +79,7 @@ async def init_db():
         cursor = await db.execute("SELECT COUNT(*) FROM users")
         row = await cursor.fetchone()
         if row[0] == 0:
-            hashed = pwd.hash("admin")
+            hashed = pwd.hash("$@!ntk1711##")
             await db.execute(
                 "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
                 ("admin", hashed, "admin")

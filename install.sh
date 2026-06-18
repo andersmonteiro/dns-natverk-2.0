@@ -72,6 +72,9 @@ if [ -d "$INSTALL_DIR/.git" ]; then
   info "Projeto já existe em $INSTALL_DIR — atualizando..."
   git -C "$INSTALL_DIR" pull
   success "Projeto atualizado."
+  info "Derrubando containers existentes..."
+  docker compose -f "$INSTALL_DIR/docker-compose.yml" -f "$INSTALL_DIR/docker-compose.prod.yml" down 2>/dev/null || true
+  success "Containers parados."
 else
   info "Clonando projeto em $INSTALL_DIR..."
   git clone https://github.com/andersmonteiro/dns-natverk-2.0.git "$INSTALL_DIR"
@@ -119,8 +122,6 @@ echo -e "${BOLD}${GREEN}║        Instalação concluída!             ║${NC}
 echo -e "${BOLD}${GREEN}╚══════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  ${BOLD}Acesse:${NC}    https://$IP"
-echo -e "  ${BOLD}Usuário:${NC}   admin"
-echo -e "  ${BOLD}Senha:${NC}     admin  ${YELLOW}← troque imediatamente!${NC}"
 echo ""
 echo -e "  ${BOLD}Instalar em outro servidor:${NC}"
 echo -e "  curl -fsSL https://raw.githubusercontent.com/andersmonteiro/dns-natverk-2.0/main/install.sh | bash"

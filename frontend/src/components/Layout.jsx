@@ -144,18 +144,20 @@ export default function Layout() {
         flexDirection: 'column',
         flexShrink: 0,
       }}>
-        {/* Logo */}
+        {/* Logo — mesma altura da topbar (52px) */}
         <div style={{
-          padding: '16px 16px 12px',
+          height: 52,
+          flexShrink: 0,
           borderBottom: '1px solid var(--border)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          padding: '0 16px',
         }}>
           <img
             src="/natverk_logo.svg"
             alt="Nätverk"
-            style={{ height: 32, width: 'auto', maxWidth: 180 }}
+            style={{ height: 28, width: 'auto', maxWidth: 180 }}
           />
         </div>
 

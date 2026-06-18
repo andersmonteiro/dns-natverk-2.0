@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { ThemeProvider } from './context/ThemeContext'
 import { RefreshProvider } from './context/RefreshContext'
 import Layout from './components/Layout'
@@ -20,28 +20,39 @@ function PrivateRoute({ children }) {
   return token ? children : <Navigate to="/login" replace />
 }
 
+// Usa location.key pra forçar remount de qualquer página ao navegar
+// (inclusive ao clicar no mesmo item do menu — limpa estado da página)
+function AppRoutes() {
+  const location = useLocation()
+  const k = location.key
+
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dashboard"  element={<Dashboard  key={k} />} />
+        <Route path="metrics"    element={<Metrics    key={k} />} />
+        <Route path="operations" element={<Operations key={k} />} />
+        <Route path="blocklist"  element={<Blocklist  key={k} />} />
+        <Route path="whitelist"  element={<Whitelist  key={k} />} />
+        <Route path="audit"      element={<Audit      key={k} />} />
+        <Route path="users"      element={<Users      key={k} />} />
+        <Route path="tools"      element={<Tools      key={k} />} />
+        <Route path="backups"    element={<Backups    key={k} />} />
+        <Route path="bindlog"    element={<BindLog    key={k} />} />
+        <Route path="profile"    element={<Profile    key={k} />} />
+      </Route>
+    </Routes>
+  )
+}
+
 export default function App() {
   return (
     <ThemeProvider>
       <RefreshProvider>
         <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard"  element={<Dashboard />} />
-              <Route path="metrics"    element={<Metrics />} />
-              <Route path="operations" element={<Operations />} />
-              <Route path="blocklist"  element={<Blocklist />} />
-              <Route path="whitelist"  element={<Whitelist />} />
-              <Route path="audit"      element={<Audit />} />
-              <Route path="users"      element={<Users />} />
-              <Route path="tools"      element={<Tools />} />
-              <Route path="backups"    element={<Backups />} />
-              <Route path="bindlog"    element={<BindLog />} />
-              <Route path="profile"    element={<Profile />} />
-            </Route>
-          </Routes>
+          <AppRoutes />
         </BrowserRouter>
       </RefreshProvider>
     </ThemeProvider>

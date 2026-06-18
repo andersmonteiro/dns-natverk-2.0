@@ -5,11 +5,10 @@ import { api } from '../api'
 const QTYPES = ['', 'A', 'AAAA', 'MX', 'NS', 'TXT', 'SOA', 'CNAME', 'PTR', 'SRV', 'CAA', 'ANY']
 
 const TOOLS = [
-  { id: 'nslookup',   label: 'NSLookup',   desc: 'Consulta DNS (forward e reverso)',    wide: false, hasType: true  },
-  { id: 'ping',       label: 'Ping',        desc: 'Testa alcançabilidade ICMP',          wide: false, hasPing: true  },
-  { id: 'traceroute', label: 'Traceroute',  desc: 'Rota completa até o destino',         wide: true                  },
-  { id: 'mtr',        label: 'MTR',         desc: 'Ping + traceroute combinados',        wide: true                  },
-  { id: 'whois',      label: 'Whois',       desc: 'Informações de registro do domínio',  wide: true                  },
+  { id: 'nslookup', label: 'NSLookup', desc: 'Consulta DNS (forward e reverso)', hasType: true },
+  { id: 'ping',     label: 'Ping',     desc: 'Testa alcançabilidade ICMP',       hasPing: true },
+  { id: 'mtr',      label: 'MTR',      desc: 'Rota + latência por hop (ping + traceroute)' },
+  { id: 'whois',    label: 'Whois',    desc: 'Informações de registro do domínio' },
 ]
 
 const inputStyle = {
@@ -55,6 +54,8 @@ function ToolCard({ tool }) {
       border: '1px solid var(--border)',
       borderRadius: 'var(--r-md)',
       padding: 16,
+      display: 'flex',
+      flexDirection: 'column',
     }}>
       <div style={{ marginBottom: 10 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{tool.label}</div>
@@ -67,21 +68,21 @@ function ToolCard({ tool }) {
           onChange={e => setHost(e.target.value)}
           placeholder={placeholder}
           required
-          style={{ ...inputStyle, flex: '1 1 200px', minWidth: 160 }}
+          style={{ ...inputStyle, flex: '1 1 180px', minWidth: 140 }}
         />
 
         {tool.hasType && (
           <>
             <select value={rtype} onChange={e => setRtype(e.target.value)}
               title="Tipo de registro (opcional)"
-              style={{ ...inputStyle, width: 90 }}>
+              style={{ ...inputStyle, width: 80 }}>
               {QTYPES.map(t => <option key={t} value={t}>{t || 'Auto'}</option>)}
             </select>
             <input
               value={server}
               onChange={e => setServer(e.target.value)}
               placeholder="DNS (opcional)"
-              style={{ ...inputStyle, width: 130 }}
+              style={{ ...inputStyle, width: 120 }}
             />
           </>
         )}
@@ -120,9 +121,10 @@ function ToolCard({ tool }) {
           whiteSpace: 'pre',
           overflowX: 'auto',
           overflowY: 'auto',
-          maxHeight: tool.wide ? 420 : 280,
+          maxHeight: 320,
           fontFamily: 'monospace',
           lineHeight: 1.55,
+          flex: 1,
         }}>
           {result.output || '(sem saída)'}
         </pre>
@@ -132,23 +134,18 @@ function ToolCard({ tool }) {
 }
 
 export default function Tools() {
-  const compact = TOOLS.filter(t => !t.wide)
-  const wide    = TOOLS.filter(t => t.wide)
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <h1 style={{ fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
         <Wrench size={20} color="var(--accent)" /> Ferramentas de Diagnóstico
       </h1>
 
-      {/* NSLookup + Ping — lado a lado */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: 12 }}>
-        {compact.map(t => <ToolCard key={t.id} tool={t} />)}
-      </div>
-
-      {/* Traceroute, MTR, Whois — largura total */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {wide.map(t => <ToolCard key={t.id} tool={t} />)}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: 12,
+      }}>
+        {TOOLS.map(t => <ToolCard key={t.id} tool={t} />)}
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
