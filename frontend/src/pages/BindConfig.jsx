@@ -177,16 +177,20 @@ function AclEditor() {
   const [loading, setLoading]  = useState(true)
   const [saving, setSaving]    = useState(false)
   const [status, setStatus]    = useState(null)
-  const [ipv4, setIpv4]        = useState('')
-  const [ipv6, setIpv6]        = useState('')
-  const [newNet, setNewNet]    = useState('')
+  const [ipv4, setIpv4]           = useState('')
+  const [ipv6, setIpv6]           = useState('')
+  const [ipv4Draft, setIpv4Draft] = useState('')
+  const [ipv6Draft, setIpv6Draft] = useState('')
+  const [newNet, setNewNet]       = useState('')
 
   useEffect(() => {
     api.getAcl().then(r => {
       setAcl(r)
       const lo = r.listen_on || []
-      setIpv4(lo.find(x => x !== 'any' && !x.includes(':')) || '')
-      setIpv6(lo.find(x => x.includes(':')) || '')
+      const v4 = lo.find(x => x !== 'any' && !x.includes(':')) || ''
+      const v6 = lo.find(x => x.includes(':')) || ''
+      setIpv4(v4); setIpv4Draft(v4)
+      setIpv6(v6); setIpv6Draft(v6)
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [])
@@ -206,8 +210,8 @@ function AclEditor() {
     setSaving(true); setStatus(null)
     try {
       const listenOn = []
-      if (ipv4.trim()) listenOn.push(ipv4.trim())
-      if (ipv6.trim()) listenOn.push(ipv6.trim())
+      if (ipv4) listenOn.push(ipv4)
+      if (ipv6) listenOn.push(ipv6)
       const payload = {
         ...acl,
         allow_query: [...LOCKED_NETWORKS, ...userNetworks],
@@ -232,31 +236,41 @@ function AclEditor() {
       <div style={panel}>
         <div style={sectionLabel}>Endereço IP do servidor DNS</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {/* IPv4 */}
           <div>
             <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>IPv4</label>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <input value={ipv4} onChange={e => setIpv4(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && e.preventDefault()}
-                placeholder="ex: 177.130.50.42  (vazio = any)"
-                style={{ ...input, flex: 1 }} />
-              {ipv4.trim() && (
-                <button onClick={() => setIpv4('')} style={{ ...btn('ghost'), padding: '7px 10px', fontSize: 14 }}>×</button>
-              )}
-            </div>
+            {ipv4
+              ? <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <Chip label={ipv4} onRemove={() => { setIpv4(''); setIpv4Draft('') }} />
+                </div>
+              : <div style={{ display: 'flex', gap: 6 }}>
+                  <input value={ipv4Draft} onChange={e => setIpv4Draft(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (ipv4Draft.trim()) setIpv4(ipv4Draft.trim()) } }}
+                    placeholder="ex: 177.130.50.42"
+                    style={{ ...input, flex: 1 }} />
+                  <button onClick={() => { if (ipv4Draft.trim()) setIpv4(ipv4Draft.trim()) }}
+                    style={btn('primary')}><Plus size={13} /></button>
+                </div>
+            }
           </div>
+          {/* IPv6 */}
           <div>
             <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
               IPv6 <span style={{ opacity: .5 }}>(opcional)</span>
             </label>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <input value={ipv6} onChange={e => setIpv6(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && e.preventDefault()}
-                placeholder="ex: 2804:235c::1"
-                style={{ ...input, flex: 1 }} />
-              {ipv6.trim() && (
-                <button onClick={() => setIpv6('')} style={{ ...btn('ghost'), padding: '7px 10px', fontSize: 14 }}>×</button>
-              )}
-            </div>
+            {ipv6
+              ? <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <Chip label={ipv6} onRemove={() => { setIpv6(''); setIpv6Draft('') }} />
+                </div>
+              : <div style={{ display: 'flex', gap: 6 }}>
+                  <input value={ipv6Draft} onChange={e => setIpv6Draft(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (ipv6Draft.trim()) setIpv6(ipv6Draft.trim()) } }}
+                    placeholder="ex: 2804:235c::1"
+                    style={{ ...input, flex: 1 }} />
+                  <button onClick={() => { if (ipv6Draft.trim()) setIpv6(ipv6Draft.trim()) }}
+                    style={btn('primary')}><Plus size={13} /></button>
+                </div>
+            }
           </div>
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
