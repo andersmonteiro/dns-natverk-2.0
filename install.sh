@@ -116,14 +116,17 @@ info "Verificando se a porta 53 está disponível..."
 if systemctl is-active --quiet systemd-resolved 2>/dev/null; then
   warn "systemd-resolved está ocupando a porta 53. Desativando..."
   systemctl disable --now systemd-resolved
-  # Mantém resolução de DNS funcional via /etc/resolv.conf estático
-  if [ ! -f /etc/resolv.conf.bak ]; then
-    cp /etc/resolv.conf /etc/resolv.conf.bak 2>/dev/null || true
-  fi
+
+  # /etc/resolv.conf costuma ser symlink para o stub do systemd — substitui por arquivo real
   rm -f /etc/resolv.conf
-  echo "nameserver 8.8.8.8" > /etc/resolv.conf
-  echo "nameserver 1.1.1.1" >> /etc/resolv.conf
-  success "systemd-resolved desativado. /etc/resolv.conf ajustado."
+  printf "nameserver 8.8.8.8\nnameserver 1.1.1.1\n" > /etc/resolv.conf
+  chmod 644 /etc/resolv.conf
+
+  # Confirma que DNS externo funciona antes de continuar
+  if ! getent hosts registry-1.docker.io &>/dev/null; then
+    error "DNS externo não funcionando após desativar systemd-resolved. Verifique /etc/resolv.conf"
+  fi
+  success "systemd-resolved desativado. /etc/resolv.conf ajustado para 8.8.8.8."
 fi
 
 # Verifica se porta 53 UDP ainda está em uso
