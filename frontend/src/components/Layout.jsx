@@ -17,7 +17,7 @@ const navItems = [
   { to: '/whitelist',  icon: ShieldCheck,       label: 'Whitelist' },
   { to: '/tools',      icon: Wrench,            label: 'Ferramentas' },
   { to: '/bindconfig', icon: Server,             label: 'Configurar DNS' },
-  { to: '/bindlog',    icon: FileText,           label: 'Log DNS' },
+  { to: '/bindlog',    icon: FileText,           label: 'Log DNS'  },
   { to: '/backups',    icon: HardDrive,          label: 'Backups' },
   { to: '/users',      icon: Users,             label: 'Usuários' },
   { to: '/audit',      icon: ClipboardList,     label: 'Auditoria' },

@@ -55,7 +55,7 @@ export default function BindLog() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <FileText size={20} color="var(--accent)" /> Log do BIND (querylog)
+          <FileText size={20} color="var(--accent)" /> Log DNS
         </h1>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <select
