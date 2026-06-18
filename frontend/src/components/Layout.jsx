@@ -2,12 +2,11 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Activity, Terminal, ShieldOff, ShieldCheck,
   ClipboardList, Users, Wrench, HardDrive, FileText, UserCircle,
-  LogOut, Sun, Moon, RefreshCw, ChevronDown, Server,
+  LogOut, Sun, Moon, Server,
 } from 'lucide-react'
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { clearToken } from '../api'
 import { useTheme } from '../context/ThemeContext'
-import { useRefresh, INTERVALS } from '../context/RefreshContext'
 import Clock from './Clock'
 
 const navItems = [
@@ -23,107 +22,6 @@ const navItems = [
   { to: '/users',      icon: Users,             label: 'Usuários' },
   { to: '/audit',      icon: ClipboardList,     label: 'Auditoria' },
 ]
-
-function RefreshButton() {
-  const { interval, setInterval, countdown, manualRefresh } = useRefresh()
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-
-  useEffect(() => {
-    function handler(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  const current = INTERVALS.find(i => i.value === interval) || INTERVALS[0]
-  const pct = interval > 0 ? ((interval - countdown) / interval) * 100 : 0
-
-  return (
-    <div ref={ref} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 0 }}>
-      {/* Botão Refresh manual */}
-      <button
-        onClick={manualRefresh}
-        title="Refresh agora"
-        style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '6px 10px',
-          background: 'var(--bg-panel-2)',
-          border: '1px solid var(--border)',
-          borderRight: 'none',
-          borderRadius: 'var(--r-sm) 0 0 var(--r-sm)',
-          color: 'var(--text-secondary)',
-          cursor: 'pointer', fontSize: 12,
-          position: 'relative', overflow: 'hidden',
-        }}
-      >
-        <RefreshCw size={13} />
-        {interval > 0 && (
-          <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 24, textAlign: 'right' }}>
-            {countdown}s
-          </span>
-        )}
-        {/* barra de progresso */}
-        {interval > 0 && (
-          <div style={{
-            position: 'absolute', bottom: 0, left: 0,
-            height: 2, width: `${pct}%`,
-            background: 'var(--accent)',
-            transition: 'width 1s linear',
-          }} />
-        )}
-      </button>
-
-      {/* Seletor de intervalo */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 4,
-          padding: '6px 8px',
-          background: 'var(--bg-panel-2)',
-          border: '1px solid var(--border)',
-          borderRadius: '0 var(--r-sm) var(--r-sm) 0',
-          color: 'var(--text-secondary)',
-          cursor: 'pointer', fontSize: 12,
-        }}
-      >
-        {current.label} <ChevronDown size={12} />
-      </button>
-
-      {/* Dropdown */}
-      {open && (
-        <div style={{
-          position: 'absolute', top: '110%', right: 0,
-          background: 'var(--bg-panel)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--r-md)',
-          boxShadow: '0 8px 24px rgba(0,0,0,.3)',
-          zIndex: 100, minWidth: 100, overflow: 'hidden',
-        }}>
-          {INTERVALS.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => { setInterval(opt.value); setOpen(false) }}
-              style={{
-                display: 'block', width: '100%', textAlign: 'left',
-                padding: '8px 14px', background: 'transparent',
-                border: 'none', cursor: 'pointer',
-                color: opt.value === interval ? 'var(--accent)' : 'var(--text-secondary)',
-                fontWeight: opt.value === interval ? 700 : 400,
-                fontSize: 13,
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-panel-2)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 export default function Layout() {
   const navigate = useNavigate()
@@ -229,8 +127,6 @@ export default function Layout() {
           flexShrink: 0,
         }}>
           <Clock />
-
-          <RefreshButton />
 
           {/* Theme toggle */}
           <button

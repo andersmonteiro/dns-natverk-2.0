@@ -442,13 +442,6 @@ function CollapsibleFile({ title, description, fetchFn, saveFn, readOnly = false
 function AdvancedEditor() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{
-        padding: '10px 14px', borderRadius: 'var(--r-sm)',
-        background: 'var(--accent-dim)', border: '1px solid var(--accent)',
-        fontSize: 12, color: 'var(--accent)', lineHeight: 1.6,
-      }}>
-        <strong>Modo avançado:</strong> edição direta dos arquivos BIND. Alterações aqui <strong>não sincronizam</strong> com a aba ACL &amp; DNS — cada aba é independente. Para mudar forwarders ou redes autorizadas de forma estruturada, use a aba ACL &amp; DNS e clique em "Salvar e recarregar BIND".
-      </div>
       <CollapsibleFile
         title="named.conf.options"
         description="Opções globais: forwarders, ACL, performance, logging"

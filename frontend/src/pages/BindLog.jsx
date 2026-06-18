@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { FileText, RefreshCw, ArrowDown, Loader } from 'lucide-react'
+import { FileText, ArrowDown, Loader } from 'lucide-react'
 import { api } from '../api'
 import Panel from '../components/Panel'
+import RefreshBar from '../components/RefreshBar'
+import { useRefresh } from '../context/RefreshContext'
 
 const LINE_OPTIONS = [50, 100, 200, 500, 1000]
 
@@ -27,9 +29,8 @@ export default function BindLog() {
   const [loading, setLoading] = useState(true)
   const [exists, setExists] = useState(true)
   const [linesCount, setLinesCount] = useState(200)
-  const [autoRefresh, setAutoRefresh] = useState(false)
   const bottomRef = useRef(null)
-  const intervalRef = useRef(null)
+  const { tick } = useRefresh()
 
   async function load() {
     try {
@@ -44,15 +45,7 @@ export default function BindLog() {
   }
 
   useEffect(() => { load() }, [linesCount])
-
-  useEffect(() => {
-    if (autoRefresh) {
-      intervalRef.current = setInterval(load, 5000)
-    } else {
-      clearInterval(intervalRef.current)
-    }
-    return () => clearInterval(intervalRef.current)
-  }, [autoRefresh, linesCount])
+  useEffect(() => { if (tick > 0) load() }, [tick])
 
   function scrollBottom() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -79,26 +72,15 @@ export default function BindLog() {
           >
             {LINE_OPTIONS.map(n => <option key={n} value={n}>{n} linhas</option>)}
           </select>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)', cursor: 'pointer' }}>
-            <input type="checkbox" checked={autoRefresh} onChange={e => setAutoRefresh(e.target.checked)} />
-            Auto (5s)
-          </label>
-          <button onClick={load} style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '7px 12px', background: 'transparent',
-            border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-            color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer',
-          }}>
-            <RefreshCw size={13} /> Atualizar
-          </button>
           <button onClick={scrollBottom} style={{
             display: 'flex', alignItems: 'center', gap: 6,
-            padding: '7px 12px', background: 'transparent',
+            padding: '6px 12px', background: 'var(--bg-panel-2)',
             border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
             color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer',
           }}>
             <ArrowDown size={13} /> Final
           </button>
+          <RefreshBar />
         </div>
       </div>
 
@@ -117,7 +99,7 @@ export default function BindLog() {
 
       <Panel
         title="Saída do querylog"
-        subtitle={`${lines.length} linhas${autoRefresh ? ' • Auto-refresh ativo' : ''}`}
+        subtitle={`${lines.length} linhas`}
       >
         {loading ? (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>

@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { api } from '../api'
 import Panel from '../components/Panel'
 import TimeRange from '../components/TimeRange'
+import RefreshBar from '../components/RefreshBar'
 import { useInterval } from '../hooks/useInterval'
 import { useRefresh } from '../context/RefreshContext'
 
@@ -41,7 +42,10 @@ export default function Metrics() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700 }}>Métricas</h1>
-        <TimeRange value={range} onChange={setRange} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <TimeRange value={range} onChange={setRange} />
+          <RefreshBar />
+        </div>
       </div>
 
       <Panel title="Top 20 Clientes por Volume" subtitle={`últimas ${range}`}>

@@ -7,6 +7,7 @@ import {
 import { api } from '../api'
 import Panel, { StatCard } from '../components/Panel'
 import TimeRange from '../components/TimeRange'
+import RefreshBar from '../components/RefreshBar'
 import { useInterval } from '../hooks/useInterval'
 import { useRefresh } from '../context/RefreshContext'
 
@@ -100,7 +101,10 @@ export default function Dashboard() {
             {host?.fqdn || host?.hostname || 'Carregando…'} · BIND {bind?.version || '—'}
           </p>
         </div>
-        <TimeRange value={range} onChange={r => { setRange(r); }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <TimeRange value={range} onChange={r => { setRange(r); }} />
+          <RefreshBar />
+        </div>
       </div>
 
       {/* Stat cards */}
