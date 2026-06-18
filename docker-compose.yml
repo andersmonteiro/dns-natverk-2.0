@@ -1,0 +1,49 @@
+services:
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    privileged: true
+    pid: host
+    volumes:
+      - dns_data:/data
+      - /var/log/named:/var/log/named:ro
+      - /etc/bind:/etc/bind:ro
+      - /var/cache/bind:/var/cache/bind:ro
+    environment:
+      - DATABASE_URL=sqlite:////data/dns_panel.db
+      - SECRET_KEY=${SECRET_KEY:-changeme-please-set-in-env}
+      - BIND_LOG_PATH=${BIND_LOG_PATH:-/var/log/named/queries.log}
+      - RNDC_PATH=${RNDC_PATH:-/usr/sbin/rndc}
+      - COLLECTOR_ENABLED=${COLLECTOR_ENABLED:-true}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - internal
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    networks:
+      - internal
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - internal
+
+volumes:
+  dns_data:
+
+networks:
+  internal:
+    driver: bridge

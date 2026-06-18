@@ -1,0 +1,33 @@
+# Env com secrets reais
+.env
+
+# Dados do banco
+dns_data/
+*.db
+
+# Certificados SSL (gere no servidor)
+nginx/certs/*.crt
+nginx/certs/*.key
+nginx/certs/*.pem
+
+# Node
+node_modules/
+frontend/node_modules/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Build frontend
+frontend/dist/
+
+# Docker volumes locais
+volumes/
+
+# Editor
+.vscode/
+.idea/
+*.swp

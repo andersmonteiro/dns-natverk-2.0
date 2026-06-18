@@ -1,0 +1,73 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-canvas:   #0b0d12;
+  --bg-panel:    #111318;
+  --bg-panel-2:  #181b22;
+  --bg-hover:    #1e2230;
+  --border:      #1f2535;
+  --border-2:    #2a3147;
+
+  --text-primary:  #e8eaf0;
+  --text-secondary:#8b90a0;
+  --text-muted:    #555c70;
+
+  --accent:      #3b82f6;
+  --accent-dim:  #1e3a5f;
+  --green:       #22c55e;
+  --green-dim:   #14532d;
+  --yellow:      #eab308;
+  --yellow-dim:  #422006;
+  --red:         #ef4444;
+  --red-dim:     #450a0a;
+  --orange:      #f97316;
+  --orange-dim:  #431407;
+  --border-dim:  #161a24;
+
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Tema claro ─────────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-canvas:   #f0f2f7;
+  --bg-panel:    #ffffff;
+  --bg-panel-2:  #f5f6fa;
+  --bg-hover:    #e8ebf3;
+  --border:      #dde1ec;
+  --border-2:    #c8cede;
+  --border-dim:  #eaedf5;
+
+  --text-primary:   #1a1d27;
+  --text-secondary: #4b5168;
+  --text-muted:     #8b90a0;
+
+  --accent:      #2563eb;
+  --accent-dim:  #dbeafe;
+  --green:       #16a34a;
+  --green-dim:   #dcfce7;
+  --yellow:      #ca8a04;
+  --yellow-dim:  #fef9c3;
+  --red:         #dc2626;
+  --red-dim:     #fee2e2;
+  --orange:      #ea580c;
+  --orange-dim:  #ffedd5;
+}
+
+body {
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #3a4055; }
+
+input, select, button { font-family: inherit; font-size: inherit; }
