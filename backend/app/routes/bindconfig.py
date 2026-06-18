@@ -47,13 +47,41 @@ DEFAULT_ACL = {
 }
 
 
-def _parse_forwarders_from_options(content: str) -> list:
-    """Extrai IPs do bloco forwarders { ... } de named.conf.options."""
-    m = re.search(r'forwarders\s*\{([^}]*)\}', content, re.DOTALL)
+_IP_RE = r'([\da-fA-F:\.]+(?:/\d+)?|localhost|any)'
+
+def _parse_block(content: str, keyword: str) -> list:
+    """Extrai lista de valores de um bloco 'keyword { val; val; }' no named.conf."""
+    m = re.search(rf'{re.escape(keyword)}\s*\{{([^}}]*)\}}', content, re.DOTALL)
     if not m:
         return []
-    block = m.group(1)
-    return re.findall(r'([\da-fA-F:\.]+(?:/\d+)?)\s*;', block)
+    return re.findall(_IP_RE + r'\s*;', m.group(1))
+
+def _sync_acl_from_options(content: str) -> None:
+    """Lê named.conf.options e atualiza natverk-acl.json com forwarders,
+    allow_query e listen_on — mantendo demais campos intactos."""
+    acl = _load_acl()
+    changed = False
+
+    fwds = _parse_block(content, 'forwarders')
+    if fwds:
+        acl['forwarders'] = fwds
+        changed = True
+
+    aq = _parse_block(content, 'allow-query')
+    if aq:
+        acl['allow_query'] = aq
+        changed = True
+
+    # listen-on port 53 { ip; ip; }
+    m = re.search(r'listen-on\s+port\s+53\s*\{([^}]*)\}', content, re.DOTALL)
+    if m:
+        lo = re.findall(_IP_RE + r'\s*;', m.group(1))
+        if lo:
+            acl['listen_on'] = lo
+            changed = True
+
+    if changed:
+        ACL_FILE.write_text(json.dumps(acl, indent=2))
 
 
 def _load_acl() -> dict:
@@ -222,13 +250,9 @@ async def save_options(data: SaveOptions, user=Depends(require_admin)):
     if not res["ok"]:
         OPT_CONF.write_text(backup)
         raise HTTPException(400, f"Erro de sintaxe: {res['output']}")
-    # Sincroniza forwarders de volta ao natverk-acl.json
+    # Sincroniza forwarders, allow_query e listen_on de volta ao natverk-acl.json
     try:
-        fwds = _parse_forwarders_from_options(data.content)
-        if fwds:
-            acl = _load_acl()
-            acl["forwarders"] = fwds
-            ACL_FILE.write_text(json.dumps(acl, indent=2))
+        _sync_acl_from_options(data.content)
     except Exception:
         pass
     await _rndc("reconfig")
