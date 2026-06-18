@@ -534,6 +534,29 @@ async def check_config(user=Depends(require_admin)):
     return res
 
 
+class ValidateContent(BaseModel):
+    content: str
+    filename: str  # ex: "named.conf.options"
+
+@router.post("/validate")
+async def validate_content(data: ValidateContent, user=Depends(get_current_user)):
+    """Valida conteúdo sem salvar: escreve temporariamente, roda checkconf, reverte."""
+    safe_name = Path(data.filename).name  # previne path traversal
+    target = CONF_DIR / safe_name
+    backup = target.read_text() if target.exists() else None
+    try:
+        target.write_text(data.content)
+        res = await _run(["named-checkconf", str(CONF_DIR / "named.conf")])
+        if res["ok"] and not res["output"]:
+            res["output"] = "✓ Configuração válida — nenhum erro encontrado"
+        return res
+    finally:
+        if backup is not None:
+            target.write_text(backup)
+        elif target.exists():
+            target.unlink()
+
+
 # ── named.conf.bloqueios ─────────────────────────────────────────────────────
 
 @router.get("/bloqueios")

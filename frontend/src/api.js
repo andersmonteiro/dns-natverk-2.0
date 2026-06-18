@@ -122,7 +122,8 @@ export const api = {
   saveZoneFile:    (name, content) => request(`/bindconfig/zones/${encodeURIComponent(name)}/file`, { method: 'PUT', body: JSON.stringify({ content }) }),
   addRecord:       (zone, data) => request(`/bindconfig/zones/${encodeURIComponent(zone)}/records`, { method: 'POST', body: JSON.stringify(data) }),
   deleteRecord:    (zone, record_line) => request(`/bindconfig/zones/${encodeURIComponent(zone)}/records`, { method: 'DELETE', body: JSON.stringify({ record_line }) }),
-  checkBindConf:   () => request('/bindconfig/check', { method: 'POST' }),
+  checkBindConf:        () => request('/bindconfig/check', { method: 'POST' }),
+  validateBindContent:  (content, filename) => request('/bindconfig/validate', { method: 'POST', body: JSON.stringify({ content, filename }) }),
 
   // ACL / Configurações estruturadas
   getAcl:          () => request('/bindconfig/acl'),

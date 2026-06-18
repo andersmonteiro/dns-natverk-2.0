@@ -353,7 +353,8 @@ function CollapsibleFile({ title, description, fetchFn, saveFn, readOnly = false
   async function check() {
     setChecking(true); setStatus(null)
     try {
-      const r = await api.checkBindConf()
+      // Valida o conteúdo atual do editor (não o arquivo salvo em disco)
+      const r = await api.validateBindContent(content, title)
       setStatus({
         ok: r.ok,
         msg: r.ok ? '✓ Configuração válida — nenhum erro encontrado' : r.output,
