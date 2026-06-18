@@ -1,23 +1,17 @@
 # Overlay para produção em servidores Debian com BIND9 instalado no host.
-# Usa network_mode: host para acesso direto ao rndc (porta 953) e porta 53.
-#
-# Uso:
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-#
-# Ou defina um alias no servidor:
-#   alias dc-dns='docker compose -f docker-compose.yml -f docker-compose.prod.yml'
+# Uso: make prod  ou  make prod-build
 
 services:
   backend:
     network_mode: host
-    extra_hosts: []       # não precisa com host network
+    extra_hosts: []
 
   frontend:
     network_mode: host
 
   nginx:
     network_mode: host
-    ports: []             # ignorado com host network; nginx escuta direto no host
+    ports: []
     volumes:
       - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/certs:/etc/nginx/certs:ro

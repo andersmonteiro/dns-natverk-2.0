@@ -17,14 +17,10 @@ services:
       - COLLECTOR_ENABLED=${COLLECTOR_ENABLED:-true}
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    networks:
-      - internal
 
   frontend:
     build: ./frontend
     restart: unless-stopped
-    networks:
-      - internal
 
   nginx:
     image: nginx:alpine
@@ -38,12 +34,6 @@ services:
     depends_on:
       - backend
       - frontend
-    networks:
-      - internal
 
 volumes:
   dns_data:
-
-networks:
-  internal:
-    driver: bridge
