@@ -111,6 +111,8 @@ function Modal({ title, onClose, children }) {
   )
 }
 
+// ── aba: ACL & Forwarders ────────────────────────────────────────────────────
+
 // ── aba: ACL & DNS ───────────────────────────────────────────────────────────
 
 const LOCKED_NETWORKS = ['localhost', '127.0.0.1', '::1', '192.168.0.0/16', '172.16.0.0/12', '10.0.0.0/8']
@@ -125,7 +127,7 @@ function Chip({ label, onRemove, locked }) {
     <div style={{
       display: 'inline-flex', alignItems: 'center', gap: 5,
       background: locked ? 'var(--bg-panel-2)' : 'var(--bg-canvas)',
-      border: `1px solid ${locked ? 'var(--border)' : 'var(--border)'}`,
+      border: '1px solid var(--border)',
       borderRadius: 'var(--r-sm)', padding: '4px 8px',
       fontSize: 12, fontFamily: 'monospace',
       color: locked ? 'var(--text-muted)' : 'var(--text-primary)',
@@ -175,42 +177,41 @@ function AclEditor() {
   const [loading, setLoading]  = useState(true)
   const [saving, setSaving]    = useState(false)
   const [status, setStatus]    = useState(null)
-
-  // IPs do servidor (listen_on)
-  const [ipv4, setIpv4] = useState('')
-  const [ipv6, setIpv6] = useState('')
+  const [ipv4, setIpv4]        = useState('')
+  const [ipv6, setIpv6]        = useState('')
+  const [newNet, setNewNet]    = useState('')
 
   useEffect(() => {
     api.getAcl().then(r => {
       setAcl(r)
-      // Extrai IPv4/IPv6 do listen_on (ignora 'any')
       const lo = r.listen_on || []
-      const v4 = lo.find(x => x !== 'any' && !x.includes(':')) || ''
-      const v6 = lo.find(x => x.includes(':')) || ''
-      setIpv4(v4); setIpv6(v6)
+      setIpv4(lo.find(x => x !== 'any' && !x.includes(':')) || '')
+      setIpv6(lo.find(x => x.includes(':')) || '')
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [])
 
   function set(key, val) { setAcl(a => ({ ...a, [key]: val })) }
 
-  // Redes adicionadas pelo usuário (não-padrão)
   const userNetworks = (acl?.allow_query || []).filter(n => !LOCKED_NETWORKS.includes(n))
 
-  function buildListenOn() {
-    const parts = []
-    if (ipv4.trim()) parts.push(ipv4.trim())
-    if (ipv6.trim()) parts.push(ipv6.trim())
-    return parts.length ? parts : ['any']
+  function addNetwork() {
+    const v = newNet.trim()
+    if (!v || (acl?.allow_query || []).includes(v)) return
+    set('allow_query', [...(acl?.allow_query || []), v])
+    setNewNet('')
   }
 
   async function save() {
     setSaving(true); setStatus(null)
     try {
+      const listenOn = []
+      if (ipv4.trim()) listenOn.push(ipv4.trim())
+      if (ipv6.trim()) listenOn.push(ipv6.trim())
       const payload = {
         ...acl,
         allow_query: [...LOCKED_NETWORKS, ...userNetworks],
-        listen_on: buildListenOn(),
+        listen_on: listenOn.length ? listenOn : ['any'],
       }
       const r = await api.saveAcl(payload)
       setStatus({ ok: r.ok, msg: r.output })
@@ -237,7 +238,9 @@ function AclEditor() {
               placeholder="ex: 177.130.50.42  (vazio = any)" style={input} />
           </div>
           <div>
-            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>IPv6 <span style={{ opacity: .5 }}>(opcional)</span></label>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+              IPv6 <span style={{ opacity: .5 }}>(opcional)</span>
+            </label>
             <input value={ipv6} onChange={e => setIpv6(e.target.value)}
               placeholder="ex: 2804:235c::1" style={input} />
           </div>
@@ -250,35 +253,21 @@ function AclEditor() {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
           {LOCKED_NETWORKS.map(n => <Chip key={n} label={n} locked />)}
           {userNetworks.map(n => (
-            <Chip key={n} label={n} onRemove={() => set('allow_query', [...LOCKED_NETWORKS, ...userNetworks.filter(x => x !== n)])} />
+            <Chip key={n} label={n} onRemove={() =>
+              set('allow_query', [...LOCKED_NETWORKS, ...userNetworks.filter(x => x !== n)])
+            } />
           ))}
         </div>
-        {/* Adicionar rede do cliente */}
         <div>
-          <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Adicionar bloco público do cliente</label>
+          <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+            Adicionar bloco público do cliente
+          </label>
           <div style={{ display: 'flex', gap: 6 }}>
-            <input
-              id="acl-new-net"
+            <input value={newNet} onChange={e => setNewNet(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addNetwork())}
               placeholder="ex: 177.130.48.0/20 ou 2804:235c::/32"
-              style={{ ...input, flex: 1 }}
-              onKeyDown={e => {
-                if (e.key !== 'Enter') return
-                e.preventDefault()
-                const v = e.target.value.trim()
-                if (v && !acl.allow_query.includes(v)) {
-                  set('allow_query', [...(acl.allow_query || []), v])
-                  e.target.value = ''
-                }
-              }}
-            />
-            <button onClick={() => {
-              const el = document.getElementById('acl-new-net')
-              const v = el.value.trim()
-              if (v && !acl.allow_query.includes(v)) {
-                set('allow_query', [...(acl.allow_query || []), v])
-                el.value = ''
-              }
-            }} style={btn('primary')}><Plus size={13} /></button>
+              style={{ ...input, flex: 1 }} />
+            <button onClick={addNetwork} style={btn('primary')}><Plus size={13} /></button>
           </div>
         </div>
       </div>
@@ -347,7 +336,11 @@ function CollapsibleFile({ title, description, fetchFn, saveFn, readOnly = false
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{description}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {readOnly && <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-canvas)', padding: '2px 6px', borderRadius: 4 }}>somente leitura</span>}
+          {readOnly && (
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-canvas)', padding: '2px 6px', borderRadius: 4 }}>
+              somente leitura
+            </span>
+          )}
           {open ? <ChevronDown size={16} color="var(--text-muted)" /> : <ChevronRight size={16} color="var(--text-muted)" />}
         </div>
       </button>
@@ -403,8 +396,6 @@ function AdvancedEditor() {
     </div>
   )
 }
-
-// ── aba: Zonas (GUI) ──────────────────────────────────────────────────────────
 
 function ZonesGUI() {
   const [zones, setZones] = useState([])
@@ -588,4 +579,178 @@ function ZonesGUI() {
             border: '1px solid var(--border)',
             borderRadius: 'var(--r-sm)',
             overflow: 'hidden',
-         
+          }}>
+            {[['gui', <Layers size={12} />, 'GUI'], ['pro', <Code size={12} />, 'Pro']].map(([m, ico, lbl]) => (
+              <button key={m} onClick={() => setZoneMode(m)} style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '6px 12px', border: 'none', cursor: 'pointer', fontSize: 12,
+                background: zoneMode === m ? 'var(--accent)' : 'transparent',
+                color: zoneMode === m ? '#fff' : 'var(--text-secondary)',
+                fontWeight: zoneMode === m ? 700 : 400,
+              }}>{ico}{lbl}</button>
+            ))}
+          </div>
+          {zoneMode === 'gui' && (
+            <button onClick={() => setShowAddRecord(true)} style={btn('primary')}>
+              <Plus size={13} /> Registro
+            </button>
+          )}
+          {zoneMode === 'pro' && (
+            <button onClick={saveZonePro} disabled={saving} style={btn('primary')}>
+              {saving ? <Loader size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={12} />}
+              Salvar
+            </button>
+          )}
+        </div>
+      </div>
+
+      {status && <StatusBadge ok={status.ok} msg={status.msg} />}
+
+      {/* GUI: tabela de registros */}
+      {zoneMode === 'gui' && (
+        <div>
+          {records.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>
+              Nenhum registro encontrado. Clique em "Registro" para adicionar.
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  {['Nome', 'TTL', 'Tipo', 'Valor'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 600, fontSize: 11 }}>{h}</th>
+                  ))}
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {records.map(r => (
+                  <tr key={r.id} style={{ borderBottom: '1px solid var(--border-dim)' }}>
+                    <td style={{ padding: '9px 12px', fontWeight: 500 }}>{r.name}</td>
+                    <td style={{ padding: '9px 12px', color: 'var(--text-muted)' }}>{r.ttl}</td>
+                    <td style={{ padding: '9px 12px' }}>
+                      <span style={{
+                        background: 'var(--accent-dim)', color: 'var(--accent)',
+                        padding: '2px 7px', borderRadius: 4, fontSize: 11, fontWeight: 700,
+                      }}>{r.type}</span>
+                    </td>
+                    <td style={{ padding: '9px 12px', fontFamily: 'monospace' }}>{r.value}</td>
+                    <td style={{ padding: '9px 12px' }}>
+                      <button style={btn('danger')} onClick={async () => {
+                        const raw = `${r.name} ${r.ttl} IN ${r.type} ${r.value}`
+                        const res = await api.deleteRecord(selected.name, raw)
+                        setStatus({ ok: res.ok, msg: res.output })
+                        if (res.ok) loadZoneRecords(selected)
+                      }}>
+                        <Trash2 size={11} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* Pro: editor de texto */}
+      {zoneMode === 'pro' && (
+        <TextEditor value={zoneFileContent} onChange={setZoneFileContent} height={480} />
+      )}
+
+      {/* Modal: novo registro */}
+      {showAddRecord && (
+        <Modal title="Adicionar Registro" onClose={() => setShowAddRecord(false)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Nome</label>
+                <input value={rec.name} onChange={e => setRec(r => ({ ...r, name: e.target.value }))} placeholder="@ ou subdomínio" style={input} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>TTL</label>
+                <input value={rec.ttl} onChange={e => setRec(r => ({ ...r, ttl: e.target.value }))} placeholder="3600" style={input} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Tipo</label>
+                <select value={rec.type} onChange={e => setRec(r => ({ ...r, type: e.target.value }))} style={input}>
+                  {RECORD_TYPES.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              {rec.type === 'MX' && (
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Prioridade</label>
+                  <input value={rec.priority} onChange={e => setRec(r => ({ ...r, priority: e.target.value }))} placeholder="10" style={input} />
+                </div>
+              )}
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Valor</label>
+              <input value={rec.value} onChange={e => setRec(r => ({ ...r, value: e.target.value }))}
+                placeholder={rec.type === 'A' ? '192.168.1.1' : rec.type === 'CNAME' ? 'alvo.dominio.com.' : 'valor'}
+                style={input} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+              <button onClick={() => setShowAddRecord(false)} style={btn('ghost')}>Cancelar</button>
+              <button onClick={addRecord} disabled={saving} style={btn('primary')}>
+                {saving ? <Loader size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={12} />}
+                Adicionar
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+// ── página principal ──────────────────────────────────────────────────────────
+
+const TABS = [
+  { id: 'acl',      label: 'ACL & DNS', icon: Shield },
+  { id: 'zones',    label: 'Zonas',     icon: Layers },
+  { id: 'avancado', label: 'Avançado',  icon: Code },
+]
+
+export default function BindConfig() {
+  const [tab, setTab] = useState('acl')
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <h1 style={{ fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Server size={20} color="var(--accent)" /> Configurar DNS
+      </h1>
+
+      {/* Tabs */}
+      <div style={{
+        display: 'flex', gap: 0,
+        background: 'var(--bg-panel)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--r-md)',
+        overflow: 'hidden',
+      }}>
+        {TABS.map(({ id, label, icon: Icon }) => (
+          <button key={id} onClick={() => setTab(id)} style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+            padding: '11px 16px', border: 'none', cursor: 'pointer', fontSize: 13,
+            background: tab === id ? 'var(--accent-dim)' : 'transparent',
+            color: tab === id ? 'var(--accent)' : 'var(--text-secondary)',
+            fontWeight: tab === id ? 700 : 500,
+            borderBottom: tab === id ? '2px solid var(--accent)' : '2px solid transparent',
+          }}>
+            <Icon size={14} /> {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Conteúdo */}
+      <div style={panel}>
+        {tab === 'acl'      && <AclEditor />}
+        {tab === 'zones'    && <ZonesGUI />}
+        {tab === 'avancado' && <AdvancedEditor />}
+      </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  )
+}
