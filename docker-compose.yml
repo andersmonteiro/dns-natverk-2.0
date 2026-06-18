@@ -22,6 +22,7 @@ services:
     volumes:
       - dns_data:/data
       - bind_etc:/etc/bind        # lê/escreve config do BIND
+      - bind_cache:/var/cache/bind # needed for named-checkconf
       - bind_log:/var/log/named:ro  # lê logs
     environment:
       - DATABASE_URL=sqlite:////data/dns_panel.db

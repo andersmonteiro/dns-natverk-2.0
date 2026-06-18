@@ -11,12 +11,16 @@ chown -R bind:bind "$LOG_DIR"
 chmod 755 "$LOG_DIR"
 
 # ── Configs padrão (só na primeira execução do volume) ────────────────────────
-for f in named.conf named.conf.options named.conf.local; do
-  if [ ! -f "$BIND_CFG/$f" ]; then
-    cp "/etc/bind-defaults/$f" "$BIND_CFG/$f"
-    echo "[entrypoint] Criado: $BIND_CFG/$f"
-  fi
-done
+# Usa sentinela porque Docker pré-popula o volume com os defaults do Debian,
+# então checar se o arquivo existe não é suficiente.
+if [ ! -f "$BIND_CFG/.natverk-initialized" ]; then
+  echo "[entrypoint] Primeira execução — aplicando configs Nätverk..."
+  cp "/etc/bind-defaults/named.conf"         "$BIND_CFG/named.conf"
+  cp "/etc/bind-defaults/named.conf.options" "$BIND_CFG/named.conf.options"
+  cp "/etc/bind-defaults/named.conf.local"   "$BIND_CFG/named.conf.local"
+  touch "$BIND_CFG/.natverk-initialized"
+  echo "[entrypoint] Configs aplicadas."
+fi
 
 # ── Chave rndc (gerada uma vez, persiste no volume) ───────────────────────────
 if [ ! -f "$BIND_CFG/rndc.key" ]; then
