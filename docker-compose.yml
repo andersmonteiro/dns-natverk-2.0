@@ -16,6 +16,9 @@ services:
     restart: unless-stopped
     depends_on:
       - bind
+    cap_add:
+      - NET_RAW     # ping, traceroute, mtr direto no container
+      - NET_ADMIN   # traceroute/mtr precisam de raw sockets
     volumes:
       - dns_data:/data
       - bind_etc:/etc/bind        # lê/escreve config do BIND

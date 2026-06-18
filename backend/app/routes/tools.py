@@ -25,11 +25,6 @@ async def _run(cmd: list, timeout: int = 30) -> dict:
         return {"ok": False, "output": str(e)}
 
 
-async def _host_net(cmd: list, timeout: int = 30) -> dict:
-    """Executa no namespace de rede do host via nsenter -n.
-    Necessário para ping/traceroute/mtr mostrarem a rota real do servidor."""
-    return await _run(["nsenter", "-t", "1", "-n", "--"] + cmd, timeout)
-
 
 def _validate_host(host: str) -> str:
     host = host.strip()
@@ -62,19 +57,19 @@ async def nslookup(data: ToolRequest, user=Depends(get_current_user)):
 async def ping(data: ToolRequest, user=Depends(get_current_user)):
     host = _validate_host(data.host)
     count = max(1, min(data.count, 20))
-    return await _host_net(["ping", "-c", str(count), "-W", "2", host], timeout=60)
+    return await _run(["ping", "-c", str(count), "-W", "2", host], timeout=60)
 
 
 @router.post("/traceroute")
 async def traceroute(data: ToolRequest, user=Depends(get_current_user)):
     host = _validate_host(data.host)
-    return await _host_net(["traceroute", "-w", "2", "-m", "30", host], timeout=60)
+    return await _run(["traceroute", "-w", "2", "-m", "30", host], timeout=60)
 
 
 @router.post("/mtr")
 async def mtr(data: ToolRequest, user=Depends(get_current_user)):
     host = _validate_host(data.host)
-    return await _host_net(
+    return await _run(
         ["mtr", "--report", "--report-wide", "--report-cycles", "5", host],
         timeout=60,
     )
