@@ -64,15 +64,18 @@ async def init_bind_files():
     # natverk-acl.json + named.conf.options
     from .routes.bindconfig import ACL_FILE, DEFAULT_ACL, OPT_CONF, _load_acl, _build_options_from_acl
     import json
-    if not ACL_FILE.exists():
+    acl_fresh = not ACL_FILE.exists()
+    if acl_fresh:
         ACL_FILE.write_text(json.dumps(DEFAULT_ACL, indent=2))
 
-    # Sempre regenera named.conf.options a partir do ACL JSON para manter em sincronia
-    try:
-        acl = _load_acl()
-        OPT_CONF.write_text(_build_options_from_acl(acl))
-    except Exception:
-        pass
+    # Regenera named.conf.options apenas em fresh install ou se o arquivo não existir.
+    # Não sobrescreve edições manuais feitas pelo modo Avançado.
+    if acl_fresh or not OPT_CONF.exists():
+        try:
+            acl = _load_acl()
+            OPT_CONF.write_text(_build_options_from_acl(acl))
+        except Exception:
+            pass
 
     # Rebuild named.conf.bloqueios from DB
     try:

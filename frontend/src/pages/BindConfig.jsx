@@ -324,13 +324,13 @@ function AclEditor() {
 // ── aba: Avançado (options + local + bloqueios) ───────────────────────────────
 
 function CollapsibleFile({ title, description, fetchFn, saveFn, readOnly = false }) {
-  const [open, setOpen]       = useState(false)
-  const [content, setContent] = useState('')
-  const [loaded, setLoaded]   = useState(false)
-  const [saving, setSaving]   = useState(false)
-  const [status, setStatus]   = useState(null)
-
+  const [open, setOpen]         = useState(false)
+  const [content, setContent]   = useState('')
+  const [loaded, setLoaded]     = useState(false)
   const [loadError, setLoadError] = useState(null)
+  const [saving, setSaving]     = useState(false)
+  const [checking, setChecking] = useState(false)
+  const [status, setStatus]     = useState(null)
 
   async function load() {
     if (loaded) return
@@ -350,11 +350,33 @@ function CollapsibleFile({ title, description, fetchFn, saveFn, readOnly = false
     setStatus(null)
   }
 
+  async function check() {
+    setChecking(true); setStatus(null)
+    try {
+      const r = await api.checkBindConf()
+      setStatus({
+        ok: r.ok,
+        msg: r.ok ? '✓ Configuração válida — nenhum erro encontrado' : r.output,
+      })
+    } catch (e) {
+      setStatus({ ok: false, msg: e.message })
+    } finally {
+      setChecking(false)
+    }
+  }
+
   async function save() {
     setSaving(true); setStatus(null)
     try {
       const r = await saveFn(content)
-      setStatus({ ok: r.ok, msg: r.output })
+      // Após salvar, roda checkconf para confirmar
+      const chk = await api.checkBindConf()
+      setStatus({
+        ok: r.ok && chk.ok,
+        msg: r.ok
+          ? (chk.ok ? '✓ Arquivo salvo e BIND recarregado — configuração válida' : `Salvo, mas checkconf reportou:\n${chk.output}`)
+          : r.output,
+      })
     } catch (e) {
       setStatus({ ok: false, msg: e.message })
     } finally {
@@ -391,14 +413,22 @@ function CollapsibleFile({ title, description, fetchFn, saveFn, readOnly = false
             ? <div style={{ color: 'var(--red)', fontSize: 13 }}>Erro: {loadError}</div>
             : <>
                 <TextEditor value={content} onChange={setContent} height={360} readOnly={readOnly} />
-                {!readOnly && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
-                    <button onClick={save} disabled={saving} style={btn('primary')}>
-                      {saving ? <Loader size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={12} />}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
+                  <button onClick={check} disabled={checking || saving} style={btn('ghost')}>
+                    {checking
+                      ? <Loader size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                      : <CheckCircle size={12} />}
+                    Validar
+                  </button>
+                  {!readOnly && (
+                    <button onClick={save} disabled={saving || checking} style={btn('primary')}>
+                      {saving
+                        ? <Loader size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                        : <Save size={12} />}
                       Salvar
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
                 {status && <StatusBadge ok={status.ok} msg={status.msg} />}
               </>
           }
@@ -411,8 +441,12 @@ function CollapsibleFile({ title, description, fetchFn, saveFn, readOnly = false
 function AdvancedEditor() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
-        Edição direta dos arquivos de configuração do BIND. Alterações são validadas antes de aplicar.
+      <div style={{
+        padding: '10px 14px', borderRadius: 'var(--r-sm)',
+        background: 'var(--accent-dim)', border: '1px solid var(--accent)',
+        fontSize: 12, color: 'var(--accent)', lineHeight: 1.6,
+      }}>
+        <strong>Modo avançado:</strong> edição direta dos arquivos BIND. Alterações aqui <strong>não sincronizam</strong> com a aba ACL &amp; DNS — cada aba é independente. Para mudar forwarders ou redes autorizadas de forma estruturada, use a aba ACL &amp; DNS e clique em "Salvar e recarregar BIND".
       </div>
       <CollapsibleFile
         title="named.conf.options"
