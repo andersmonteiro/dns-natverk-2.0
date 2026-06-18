@@ -39,4 +39,4 @@ if [ ! -f "$LOG_DIR/queries.log" ]; then
 fi
 
 echo "[entrypoint] Iniciando named..."
-exec /usr/sbin/named -g -u bind
+exec /usr/sbin/named -f -u bind
