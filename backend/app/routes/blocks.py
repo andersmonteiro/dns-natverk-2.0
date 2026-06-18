@@ -12,7 +12,7 @@ from ..db import DB_PATH
 router = APIRouter(prefix="/api/blocks", tags=["blocks"])
 
 BIND_DIR    = Path(settings.bind_conf_dir)
-BLOCKS_CONF = BIND_DIR / "named.conf.blocks"
+BLOQUEIOS_CONF = BIND_DIR / "named.conf.bloqueios"
 BLOQUEIO    = BIND_DIR / "db.bloqueio"
 
 BLOQUEIO_CONTENT = """\
@@ -51,7 +51,7 @@ async def _rndc_reconfig() -> None:
 
 
 async def rebuild_blocks_conf() -> None:
-    """Regenera named.conf.blocks a partir do banco de dados e recarrega o BIND."""
+    """Regenera named.conf.bloqueios a partir do banco de dados e recarrega o BIND."""
     # Garante que db.bloqueio existe
     if not BLOQUEIO.exists():
         BLOQUEIO.write_text(BLOQUEIO_CONTENT)
@@ -64,8 +64,8 @@ async def rebuild_blocks_conf() -> None:
         f'zone "{d}" {{ type master; file "/etc/bind/db.bloqueio"; }};\n'
         for d in domains
     ]
-    header = "; Gerenciado automaticamente pelo DNS Natverk Panel\n"
-    BLOCKS_CONF.write_text(header + "".join(lines))
+    header = "// Gerenciado automaticamente pelo DNS Natverk Panel\n"
+    BLOQUEIOS_CONF.write_text(header + "".join(lines))
 
     await _rndc_reconfig()
 

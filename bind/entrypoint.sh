@@ -23,16 +23,27 @@ if [ ! -f "$BIND_CFG/.natverk-initialized" ]; then
   echo "[entrypoint] Configs aplicadas."
 fi
 
-# ── Garante include de named.conf.blocks (upgrade-safe) ──────────────────────
-if ! grep -q "named.conf.blocks" "$BIND_CFG/named.conf" 2>/dev/null; then
-  echo 'include "/etc/bind/named.conf.blocks";' >> "$BIND_CFG/named.conf"
-  echo "[entrypoint] Adicionado include named.conf.blocks ao named.conf"
+# ── Migração: remove include do antigo named.conf.blocks ─────────────────────
+if grep -q "named\.conf\.blocks" "$BIND_CFG/named.conf" 2>/dev/null; then
+  sed -i '/named\.conf\.blocks/d' "$BIND_CFG/named.conf"
+  echo "[entrypoint] Removido include de named.conf.blocks (migrado para named.conf.bloqueios)"
+fi
+# Neutraliza o arquivo antigo se ainda existir
+if [ -f "$BIND_CFG/named.conf.blocks" ]; then
+  echo '// arquivo migrado para named.conf.bloqueios' > "$BIND_CFG/named.conf.blocks"
+  echo "[entrypoint] named.conf.blocks neutralizado"
 fi
 
-# ── named.conf.blocks — criado vazio se não existir ──────────────────────────
-if [ ! -f "$BIND_CFG/named.conf.blocks" ]; then
-  echo '; Gerenciado automaticamente pelo DNS Natverk Panel' > "$BIND_CFG/named.conf.blocks"
-  echo "[entrypoint] Criado: named.conf.blocks"
+# ── Garante include de named.conf.bloqueios (upgrade-safe) ──────────────────────
+if ! grep -q "named.conf.bloqueios" "$BIND_CFG/named.conf" 2>/dev/null; then
+  echo 'include "/etc/bind/named.conf.bloqueios";' >> "$BIND_CFG/named.conf"
+  echo "[entrypoint] Adicionado include named.conf.bloqueios ao named.conf"
+fi
+
+# ── named.conf.bloqueios — criado vazio se não existir ──────────────────────────
+if [ ! -f "$BIND_CFG/named.conf.bloqueios" ]; then
+  echo '// Gerenciado automaticamente pelo DNS Natverk Panel' > "$BIND_CFG/named.conf.bloqueios"
+  echo "[entrypoint] Criado: named.conf.bloqueios"
 fi
 
 # ── db.bloqueio — criado se não existir (upgrade-safe) ───────────────────────

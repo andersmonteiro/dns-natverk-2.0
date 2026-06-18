@@ -36,10 +36,10 @@ async def init_bind_files():
     if not bind_dir.exists():
         return  # volume não montado (dev sem Docker)
 
-    # named.conf.blocks
-    blocks = bind_dir / "named.conf.blocks"
+    # named.conf.bloqueios
+    blocks = bind_dir / "named.conf.bloqueios"
     if not blocks.exists():
-        blocks.write_text("; Gerenciado automaticamente pelo DNS Natverk Panel\n")
+        blocks.write_text("// Gerenciado automaticamente pelo DNS Natverk Panel\n")
 
     # db.bloqueio
     bloqueio = bind_dir / "db.bloqueio"
@@ -67,7 +67,7 @@ async def init_bind_files():
         import json
         ACL_FILE.write_text(json.dumps(DEFAULT_ACL, indent=2))
 
-    # Rebuild named.conf.blocks from DB
+    # Rebuild named.conf.bloqueios from DB
     try:
         from .routes.blocks import rebuild_blocks_conf
         await rebuild_blocks_conf()
