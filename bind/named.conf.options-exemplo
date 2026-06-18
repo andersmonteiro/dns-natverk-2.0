@@ -1,0 +1,60 @@
+root@ntk-wsp-dns01:/etc/bind# cat named.conf.options
+options {
+    directory "/var/cache/bind";
+
+    // Definindo o endereço IP onde o BIND irá escutar por requisições DNS
+    listen-on port 53 { 177.130.50.42; 127.0.0.1; };
+    listen-on-v6 port 53 { any; };
+
+    // Redes autorizadas a fazer consultas DNS neste servidor
+    allow-query {
+        localhost;
+        127.0.0.1;
+        ::1;
+        // Redes privadas internas
+        192.168.0.0/16;
+        172.16.0.0/12;
+        100.64.0.0/10;
+        10.0.0.0/8;
+        // Blocos públicos WSP (AS52747)
+        177.130.48.0/20;
+        138.99.108.0/22;
+        45.165.166.0/23;
+        2804:235c::/32;
+    };
+
+    // Definindo os servidores DNS da Cloudflare, Google e OpenDNS como forwarders
+    forwarders {
+        1.1.1.1;              // Cloudflare Primary
+        1.0.0.1;              // Cloudflare Secondary
+        2606:4700:4700::1111; // Cloudflare Primary IPv6
+        2606:4700:4700::1001; // Cloudflare Secondary IPv6
+        8.8.8.8;              // Google Primary
+        8.8.4.4;              // Google Secondary
+        2001:4860:4860::8888; // Google Primary IPv6
+        2001:4860:4860::8844; // Google Secondary IPv6
+        208.67.222.222;       // OpenDNS Primary
+        208.67.220.220;       // OpenDNS Secondary
+        2620:119:35::35;      // OpenDNS Primary IPv6
+        2620:119:53::53;      // OpenDNS Secondary IPv6
+    };
+
+    // Habilita a validação DNSSEC
+    dnssec-validation auto;
+
+    // Recursos otimizados para lidar com um alto volume de requisições
+    max-cache-size 4096M;
+    recursive-clients 15000;
+    tcp-clients 5000;
+    serial-query-rate 10000;
+
+    // Reduzindo o tempo de vida (TTL) mínimo no cache para manter as respostas atualizadas
+    min-cache-ttl 60;
+    max-cache-ttl 86400;
+    max-ncache-ttl 3600;
+
+    // Outras configurações recomendadas
+    auth-nxdomain no;
+    version "not disclosed";
+};
+root@ntk-wsp-dns01:/etc/bind# 

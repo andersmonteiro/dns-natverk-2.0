@@ -28,9 +28,57 @@ app.include_router(bindlog.router)
 app.include_router(bindconfig.router)
 
 
+async def init_bind_files():
+    """Inicializa arquivos necessários no volume bind_etc."""
+    from pathlib import Path
+    bind_dir = Path(settings.bind_conf_dir)
+
+    if not bind_dir.exists():
+        return  # volume não montado (dev sem Docker)
+
+    # named.conf.blocks
+    blocks = bind_dir / "named.conf.blocks"
+    if not blocks.exists():
+        blocks.write_text("; Gerenciado automaticamente pelo DNS Natverk Panel\n")
+
+    # db.bloqueio
+    bloqueio = bind_dir / "db.bloqueio"
+    if not bloqueio.exists():
+        bloqueio.write_text(
+            "; Zona de bloqueio — DNS Nätverk Panel\n"
+            "; Todos os domínios bloqueados apontam para esta zona (sinkhole 0.0.0.0)\n"
+            "$TTL 300\n"
+            "@ IN SOA localhost. root.localhost. (\n"
+            "    2026010101   ; serial\n"
+            "    3600         ; refresh\n"
+            "    900          ; retry\n"
+            "    86400        ; expire\n"
+            "    300 )        ; minimum TTL\n\n"
+            "@ IN NS  localhost.\n"
+            "@ IN A   0.0.0.0\n"
+            "* IN A   0.0.0.0\n"
+            "@ IN AAAA ::\n"
+            "* IN AAAA ::\n"
+        )
+
+    # natverk-acl.json
+    from .routes.bindconfig import ACL_FILE, DEFAULT_ACL
+    if not ACL_FILE.exists():
+        import json
+        ACL_FILE.write_text(json.dumps(DEFAULT_ACL, indent=2))
+
+    # Rebuild named.conf.blocks from DB
+    try:
+        from .routes.blocks import rebuild_blocks_conf
+        await rebuild_blocks_conf()
+    except Exception:
+        pass
+
+
 @app.on_event("startup")
 async def startup():
     await init_db()
+    await init_bind_files()
     if settings.collector_enabled:
         from .collectors.querylog import collect_forever
         asyncio.create_task(collect_forever())

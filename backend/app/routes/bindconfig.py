@@ -3,6 +3,7 @@ Rotas para gerenciamento de configuração do BIND9.
 O backend e o bind container compartilham o volume bind_etc (/etc/bind).
 """
 import asyncio
+import json
 import os
 import re
 import time
@@ -17,10 +18,96 @@ from ..config import settings
 
 router = APIRouter(prefix="/api/bindconfig", tags=["bindconfig"])
 
-CONF_DIR   = Path(settings.bind_conf_dir)
-ZONES_DIR  = Path(settings.bind_zones_dir)
-LOCAL_CONF = CONF_DIR / "named.conf.local"
-OPT_CONF   = CONF_DIR / "named.conf.options"
+CONF_DIR    = Path(settings.bind_conf_dir)
+ZONES_DIR   = Path(settings.bind_zones_dir)
+LOCAL_CONF  = CONF_DIR / "named.conf.local"
+OPT_CONF    = CONF_DIR / "named.conf.options"
+ACL_FILE    = CONF_DIR / "natverk-acl.json"
+
+DEFAULT_ACL = {
+    "allow_query": [
+        "localhost", "127.0.0.1", "::1",
+        "192.168.0.0/16", "172.16.0.0/12", "10.0.0.0/8",
+    ],
+    "forwarders": [
+        "1.1.1.1", "1.0.0.1",
+        "8.8.8.8", "8.8.4.4",
+        "208.67.222.222", "208.67.220.220",
+    ],
+    "listen_on": ["any"],
+    "max_cache_size": "4096M",
+    "recursive_clients": 15000,
+    "tcp_clients": 5000,
+    "min_cache_ttl": 60,
+    "max_cache_ttl": 86400,
+    "max_ncache_ttl": 3600,
+    "auth_nxdomain": False,
+    "dnssec_validation": "auto",
+    "version_hidden": True,
+}
+
+
+def _load_acl() -> dict:
+    if ACL_FILE.exists():
+        try:
+            return json.loads(ACL_FILE.read_text())
+        except Exception:
+            pass
+    return dict(DEFAULT_ACL)
+
+
+def _build_options_from_acl(acl: dict) -> str:
+    aq   = "\n".join(f"        {n};" for n in acl.get("allow_query", []))
+    fwd  = "\n".join(f"        {n};" for n in acl.get("forwarders", []))
+    listen = " ".join(f"{ip};" for ip in acl.get("listen_on", ["any"]))
+    dnssec = acl.get("dnssec_validation", "auto")
+    version = '"not disclosed"' if acl.get("version_hidden", True) else '"bind"'
+    anx  = "no" if not acl.get("auth_nxdomain", False) else "yes"
+
+    return f"""\
+options {{
+    directory "/var/cache/bind";
+
+    listen-on port 53 {{ {listen} }};
+    listen-on-v6 port 53 {{ any; }};
+
+    // Redes autorizadas a fazer consultas DNS neste servidor
+    allow-query {{
+{aq}
+    }};
+
+    // Servidores DNS de encaminhamento
+    forwarders {{
+{fwd}
+    }};
+
+    forward first;
+    dnssec-validation {dnssec};
+
+    // Performance
+    max-cache-size {acl.get("max_cache_size", "4096M")};
+    recursive-clients {acl.get("recursive_clients", 15000)};
+    tcp-clients {acl.get("tcp_clients", 5000)};
+    min-cache-ttl {acl.get("min_cache_ttl", 60)};
+    max-cache-ttl {acl.get("max_cache_ttl", 86400)};
+    max-ncache-ttl {acl.get("max_ncache_ttl", 3600)};
+
+    auth-nxdomain {anx};
+    version {version};
+
+    querylog yes;
+}};
+
+logging {{
+    channel natverk_query_log {{
+        file "/var/log/named/queries.log" versions 5 size 20m;
+        severity dynamic;
+        print-time yes;
+        print-category yes;
+    }};
+    category queries {{ natverk_query_log; }};
+}};
+"""
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -403,3 +490,43 @@ async def check_config(user=Depends(require_admin)):
     if res["ok"] and not res["output"]:
         res["output"] = "OK — nenhum erro de configuração encontrado"
     return res
+
+
+# ── ACL / Configurações estruturadas ─────────────────────────────────────────
+
+@router.get("/acl")
+async def get_acl(user=Depends(get_current_user)):
+    return _load_acl()
+
+
+class AclSettings(BaseModel):
+    allow_query: list[str]
+    forwarders: list[str]
+    listen_on: list[str]
+    max_cache_size: str = "4096M"
+    recursive_clients: int = 15000
+    tcp_clients: int = 5000
+    min_cache_ttl: int = 60
+    max_cache_ttl: int = 86400
+    max_ncache_ttl: int = 3600
+    auth_nxdomain: bool = False
+    dnssec_validation: str = "auto"
+    version_hidden: bool = True
+
+
+@router.put("/acl")
+async def save_acl(data: AclSettings, user=Depends(require_admin)):
+    acl = data.dict()
+    options_content = _build_options_from_acl(acl)
+
+    backup = OPT_CONF.read_text() if OPT_CONF.exists() else ""
+    OPT_CONF.write_text(options_content)
+
+    res = await _run(["named-checkconf", str(CONF_DIR / "named.conf")])
+    if not res["ok"]:
+        OPT_CONF.write_text(backup)
+        raise HTTPException(400, f"Erro de configuração: {res['output']}")
+
+    ACL_FILE.write_text(json.dumps(acl, indent=2))
+    await _rndc("reconfig")
+    return {"ok": True, "output": "Configurações salvas e BIND recarregado."}

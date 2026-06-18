@@ -18,8 +18,27 @@ if [ ! -f "$BIND_CFG/.natverk-initialized" ]; then
   cp "/etc/bind-defaults/named.conf"         "$BIND_CFG/named.conf"
   cp "/etc/bind-defaults/named.conf.options" "$BIND_CFG/named.conf.options"
   cp "/etc/bind-defaults/named.conf.local"   "$BIND_CFG/named.conf.local"
+  cp "/etc/bind-defaults/db.bloqueio"        "$BIND_CFG/db.bloqueio"
   touch "$BIND_CFG/.natverk-initialized"
   echo "[entrypoint] Configs aplicadas."
+fi
+
+# ── Garante include de named.conf.blocks (upgrade-safe) ──────────────────────
+if ! grep -q "named.conf.blocks" "$BIND_CFG/named.conf" 2>/dev/null; then
+  echo 'include "/etc/bind/named.conf.blocks";' >> "$BIND_CFG/named.conf"
+  echo "[entrypoint] Adicionado include named.conf.blocks ao named.conf"
+fi
+
+# ── named.conf.blocks — criado vazio se não existir ──────────────────────────
+if [ ! -f "$BIND_CFG/named.conf.blocks" ]; then
+  echo '; Gerenciado automaticamente pelo DNS Natverk Panel' > "$BIND_CFG/named.conf.blocks"
+  echo "[entrypoint] Criado: named.conf.blocks"
+fi
+
+# ── db.bloqueio — criado se não existir (upgrade-safe) ───────────────────────
+if [ ! -f "$BIND_CFG/db.bloqueio" ]; then
+  cp "/etc/bind-defaults/db.bloqueio" "$BIND_CFG/db.bloqueio"
+  echo "[entrypoint] Criado: db.bloqueio"
 fi
 
 # ── Chave rndc (gerada uma vez, persiste no volume) ───────────────────────────

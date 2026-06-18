@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   Server, Plus, Trash2, Edit3, Code, Layers,
   CheckCircle, XCircle, RefreshCw, Save, ChevronRight,
-  ArrowLeft, Loader,
+  ArrowLeft, Loader, Shield,
 } from 'lucide-react'
 import { api } from '../api'
 
@@ -107,6 +107,175 @@ function Modal({ title, onClose, children }) {
         </div>
         {children}
       </div>
+    </div>
+  )
+}
+
+// ── aba: ACL & Forwarders ────────────────────────────────────────────────────
+
+function ListEditor({ label, items, onChange, placeholder }) {
+  const [val, setVal] = useState('')
+
+  function add() {
+    const v = val.trim()
+    if (!v || items.includes(v)) return
+    onChange([...items, v])
+    setVal('')
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600 }}>{label}</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+        {items.map(item => (
+          <div key={item} style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            background: 'var(--bg-canvas)', border: '1px solid var(--border)',
+            borderRadius: 'var(--r-sm)', padding: '4px 8px', fontSize: 12,
+            fontFamily: 'monospace', color: 'var(--text-primary)',
+          }}>
+            {item}
+            <button onClick={() => onChange(items.filter(i => i !== item))} style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--text-muted)', padding: 0, lineHeight: 1,
+              display: 'flex', alignItems: 'center',
+            }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+            >×</button>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input
+          value={val}
+          onChange={e => setVal(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), add())}
+          placeholder={placeholder}
+          style={{ ...input, flex: 1 }}
+        />
+        <button onClick={add} style={btn('primary')}><Plus size={13} /></button>
+      </div>
+    </div>
+  )
+}
+
+function AclEditor() {
+  const [acl, setAcl]       = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving]   = useState(false)
+  const [status, setStatus]   = useState(null)
+
+  useEffect(() => {
+    api.getAcl().then(r => { setAcl(r); setLoading(false) }).catch(() => setLoading(false))
+  }, [])
+
+  function set(key, val) { setAcl(a => ({ ...a, [key]: val })) }
+
+  async function save() {
+    setSaving(true); setStatus(null)
+    try {
+      const r = await api.saveAcl(acl)
+      setStatus({ ok: r.ok, msg: r.output })
+    } catch (e) {
+      setStatus({ ok: false, msg: e.message })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) return <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Carregando…</div>
+  if (!acl) return <div style={{ color: 'var(--red)', fontSize: 13 }}>Erro ao carregar configurações.</div>
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+      {/* ACL */}
+      <div style={panel}>
+        <ListEditor
+          label="Redes autorizadas (allow-query)"
+          items={acl.allow_query || []}
+          onChange={v => set('allow_query', v)}
+          placeholder="ex: 192.168.1.0/24 ou 10.0.0.0/8"
+        />
+      </div>
+
+      {/* Forwarders */}
+      <div style={panel}>
+        <ListEditor
+          label="Servidores de encaminhamento (forwarders)"
+          items={acl.forwarders || []}
+          onChange={v => set('forwarders', v)}
+          placeholder="ex: 1.1.1.1 ou 2606:4700:4700::1111"
+        />
+      </div>
+
+      {/* Listen-on */}
+      <div style={panel}>
+        <ListEditor
+          label="Interfaces de escuta (listen-on)"
+          items={acl.listen_on || []}
+          onChange={v => set('listen_on', v)}
+          placeholder='ex: 177.130.50.42 ou "any"'
+        />
+      </div>
+
+      {/* Performance */}
+      <div style={panel}>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600 }}>Performance</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+          {[
+            ['max_cache_size',    'Max cache size',      'text',   '4096M'],
+            ['recursive_clients', 'Recursive clients',   'number', 15000],
+            ['tcp_clients',       'TCP clients',         'number', 5000],
+            ['min_cache_ttl',     'Min cache TTL (s)',   'number', 60],
+            ['max_cache_ttl',     'Max cache TTL (s)',   'number', 86400],
+            ['max_ncache_ttl',    'Max ncache TTL (s)',  'number', 3600],
+          ].map(([key, lbl, type, def]) => (
+            <div key={key}>
+              <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>{lbl}</label>
+              <input
+                type={type}
+                value={acl[key] ?? def}
+                onChange={e => set(key, type === 'number' ? +e.target.value : e.target.value)}
+                style={{ ...input }}
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Toggles */}
+        <div style={{ display: 'flex', gap: 24, marginTop: 16 }}>
+          {[
+            ['version_hidden',  'Ocultar versão do BIND'],
+            ['auth_nxdomain',   'auth-nxdomain yes'],
+          ].map(([key, lbl]) => (
+            <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+              <input type="checkbox" checked={!!acl[key]} onChange={e => set(key, e.target.checked)} />
+              {lbl}
+            </label>
+          ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>DNSSEC:</label>
+            <select value={acl.dnssec_validation || 'auto'} onChange={e => set('dnssec_validation', e.target.value)}
+              style={{ ...input, width: 'auto', padding: '4px 8px' }}>
+              <option value="auto">auto</option>
+              <option value="yes">yes</option>
+              <option value="no">no</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Save */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button onClick={save} disabled={saving} style={btn('primary')}>
+          {saving ? <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
+          Salvar e recarregar BIND
+        </button>
+      </div>
+
+      {status && <StatusBadge ok={status.ok} msg={status.msg} />}
     </div>
   )
 }
@@ -511,18 +680,19 @@ function LocalEditor() {
 // ── página principal ──────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'zones',   label: 'Zonas',            icon: Layers },
-  { id: 'options', label: 'Opções do Servidor', icon: Server },
+  { id: 'acl',     label: 'ACL & DNS',         icon: Shield },
+  { id: 'zones',   label: 'Zonas',             icon: Layers },
+  { id: 'options', label: 'Opções (avançado)',  icon: Server },
   { id: 'local',   label: 'named.conf.local',  icon: Code },
 ]
 
 export default function BindConfig() {
-  const [tab, setTab] = useState('zones')
+  const [tab, setTab] = useState('acl')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <h1 style={{ fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Server size={20} color="var(--accent)" /> Configuração BIND9
+        <Server size={20} color="var(--accent)" /> Configurar DNS
       </h1>
 
       {/* Tabs */}
@@ -549,6 +719,7 @@ export default function BindConfig() {
 
       {/* Conteúdo */}
       <div style={panel}>
+        {tab === 'acl'     && <AclEditor />}
         {tab === 'zones'   && <ZonesGUI />}
         {tab === 'options' && <OptionsEditor />}
         {tab === 'local'   && <LocalEditor />}

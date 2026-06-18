@@ -1,22 +1,42 @@
 options {
     directory "/var/cache/bind";
 
-    // Forwarders padrão — ajuste via painel
+    listen-on port 53 { any; };
+    listen-on-v6 port 53 { any; };
+
+    // Redes autorizadas a fazer consultas DNS neste servidor
+    allow-query {
+        localhost;
+        127.0.0.1;
+        ::1;
+        192.168.0.0/16;
+        172.16.0.0/12;
+        10.0.0.0/8;
+    };
+
+    // Servidores DNS de encaminhamento
     forwarders {
+        1.1.1.1;
+        1.0.0.1;
         8.8.8.8;
         8.8.4.4;
-        1.1.1.1;
+        208.67.222.222;
+        208.67.220.220;
     };
 
     forward first;
-
     dnssec-validation auto;
 
-    listen-on     { any; };
-    listen-on-v6  { none; };
+    // Performance
+    max-cache-size 4096M;
+    recursive-clients 15000;
+    tcp-clients 5000;
+    min-cache-ttl 60;
+    max-cache-ttl 86400;
+    max-ncache-ttl 3600;
 
-    recursion yes;
-    allow-recursion { any; };
+    auth-nxdomain no;
+    version "not disclosed";
 
     querylog yes;
 };

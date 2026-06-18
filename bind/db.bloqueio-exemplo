@@ -1,0 +1,16 @@
+; Zona de bloqueio - Anatel - Bets_22/04/2026
+; Gerado automaticamente em 23/04/2026 16:17
+; Todos os dom  nios bloqueados apontam para esta zona
+$TTL 300
+@ IN SOA localhost. root.localhost. (
+    2026042301   ; serial
+    3600       ; refresh
+    900        ; retry
+    86400      ; expire
+    300 )      ; minimum TTL
+
+@ IN NS  localhost.
+@ IN A   0.0.0.0
+* IN A   0.0.0.0
+@ IN AAAA ::
+* IN AAAA ::
