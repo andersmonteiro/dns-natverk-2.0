@@ -85,13 +85,36 @@ cd "$INSTALL_DIR"
 
 # ── 4. Arquivo .env ───────────────────────────────────────────────────────────
 if [ ! -f .env ]; then
-  info "Gerando arquivo .env com SECRET_KEY aleatório..."
+  info "Gerando arquivo .env..."
   cp .env.example .env
+
+  # JWT secret
   SECRET=$(openssl rand -hex 32)
   sed -i "s/changeme-please-set-in-env/$SECRET/" .env
-  success "Arquivo .env criado com chave segura."
+
+  # Krill auth token
+  KRILL_TOKEN=$(openssl rand -hex 32)
+  sed -i "s/changeme-krill-token/$KRILL_TOKEN/" .env
+
+  # Detecta IP público para o FQDN do Krill
+  PUBLIC_IP=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')
+  sed -i "s/SEU_IP_OU_DOMINIO_AQUI/$PUBLIC_IP/" .env
+
+  success "Arquivo .env criado (SECRET_KEY, KRILL_AUTH_TOKEN e KRILL_FQDN configurados)."
+  info "KRILL_FQDN detectado como: $PUBLIC_IP (edite .env se precisar usar um domínio)"
 else
   warn ".env já existe — mantendo configuração atual."
+  # Adiciona variáveis do Krill se não existirem (upgrade de instalações antigas)
+  if ! grep -q "KRILL_AUTH_TOKEN" .env; then
+    KRILL_TOKEN=$(openssl rand -hex 32)
+    PUBLIC_IP=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')
+    echo "" >> .env
+    echo "# Krill RPKI (adicionado pelo instalador)" >> .env
+    echo "KRILL_AUTH_TOKEN=$KRILL_TOKEN" >> .env
+    echo "KRILL_FQDN=$PUBLIC_IP" >> .env
+    echo "TZ=America/Sao_Paulo" >> .env
+    info "Variáveis do Krill adicionadas ao .env existente. KRILL_FQDN=$PUBLIC_IP"
+  fi
 fi
 
 # ── 5. Certificado SSL ────────────────────────────────────────────────────────
