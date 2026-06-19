@@ -49,7 +49,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 }
 
 export default function Dashboard() {
-  const [range, setRange] = useState('24h')
+  const [range, setRange] = useState('1h')
   const [sys, setSys] = useState(null)
   const [ts, setTs] = useState([])
   const [clients, setClients] = useState([])
@@ -98,7 +98,7 @@ export default function Dashboard() {
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>Dashboard</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 2 }}>
-            {host?.fqdn || host?.hostname || 'Carregando…'} · BIND {bind?.version || '—'}
+            {host?.fqdn || host?.hostname || 'Carregando…'} · DNS {bind?.version || '—'}
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -109,9 +109,9 @@ export default function Dashboard() {
 
       {/* Stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
-        <StatCard label="BIND" icon={Activity}
+        <StatCard label="DNS" icon={Activity}
           value={bind?.active ? 'Online' : 'Offline'}
-          sub={`uptime ${fmtUptime(bind?.uptime_secs)}`}
+          sub={bind?.uptime_secs ? `uptime ${fmtUptime(bind.uptime_secs)}` : 'uptime —'}
           color={bind?.active ? 'var(--green)' : 'var(--red)'}
         />
         <StatCard label="CPU" icon={Cpu}

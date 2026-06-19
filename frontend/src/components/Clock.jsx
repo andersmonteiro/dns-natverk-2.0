@@ -7,6 +7,9 @@ export default function Clock() {
     return () => clearInterval(t)
   }, [])
 
+  const date = time.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+  const hour = time.toLocaleTimeString('pt-BR')
+
   return (
     <span style={{
       fontVariantNumeric: 'tabular-nums',
@@ -18,7 +21,7 @@ export default function Clock() {
       padding: '4px 10px',
       letterSpacing: '.3px',
     }}>
-      {time.toLocaleTimeString('pt-BR')}
+      {date} {hour}
     </span>
   )
 }

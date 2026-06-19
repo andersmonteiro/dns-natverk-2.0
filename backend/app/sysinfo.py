@@ -44,6 +44,9 @@ def get_host_info() -> dict:
 
 def get_bind_status() -> dict:
     import socket as _socket
+    import os as _os
+    from email.utils import parsedate_to_datetime as _parsedate
+    import datetime as _dt
 
     # Bridge network: tenta host.docker.internal primeiro, depois fallbacks
     active = False
@@ -56,7 +59,7 @@ def get_bind_status() -> dict:
         except Exception:
             continue
 
-    # Tenta pegar a versão do named (se o bind9utils estiver no container)
+    # Versão via named -v
     version = None
     try:
         r = subprocess.run(["named", "-v"], capture_output=True, text=True, timeout=5)
@@ -66,9 +69,28 @@ def get_bind_status() -> dict:
     except Exception:
         pass
 
+    # Uptime via rndc status — parseia "boot time: ..."
+    uptime_secs = None
+    try:
+        rndc_host = _os.environ.get("RNDC_HOST", "bind")
+        rndc_key  = _os.environ.get("RNDC_KEY_FILE", "/etc/bind/rndc.key")
+        r = subprocess.run(
+            ["rndc", "-s", rndc_host, "-k", rndc_key, "status"],
+            capture_output=True, text=True, timeout=5,
+        )
+        for line in r.stdout.splitlines():
+            if line.lower().startswith("boot time:"):
+                boot_str = line.split(":", 1)[1].strip()
+                boot_dt  = _parsedate(boot_str)
+                now      = _dt.datetime.now(_dt.timezone.utc)
+                uptime_secs = int((now - boot_dt).total_seconds())
+                break
+    except Exception:
+        pass
+
     return {
         "active": active,
         "state": "running" if active else "stopped",
         "version": version,
-        "uptime_secs": None,
+        "uptime_secs": uptime_secs,
     }
