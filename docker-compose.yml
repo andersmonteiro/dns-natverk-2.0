@@ -13,6 +13,16 @@ services:
       - bind_cache:/var/cache/bind
       - bind_log:/var/log/named   # logs (compartilhado com backend)
 
+  krill:
+    build: ./krill
+    restart: unless-stopped
+    environment:
+      - KRILL_AUTH_TOKEN=${KRILL_AUTH_TOKEN:-change-me-krill-token}
+      - KRILL_FQDN=${KRILL_FQDN:-localhost}
+      - TZ=${TZ:-America/Sao_Paulo}
+    volumes:
+      - krill_data:/var/krill/data
+
   backend:
     build: ./backend
     restart: unless-stopped
@@ -35,6 +45,8 @@ services:
       - RNDC_HOST=${RNDC_HOST:-bind}
       - RNDC_KEY_FILE=${RNDC_KEY_FILE:-/etc/bind/rndc.key}
       - COLLECTOR_ENABLED=${COLLECTOR_ENABLED:-true}
+      - KRILL_URL=${KRILL_URL:-https://krill:3000}
+      - KRILL_AUTH_TOKEN=${KRILL_AUTH_TOKEN:-change-me-krill-token}
 
   frontend:
     build: ./frontend
@@ -58,3 +70,4 @@ volumes:
   bind_etc:
   bind_cache:
   bind_log:
+  krill_data:

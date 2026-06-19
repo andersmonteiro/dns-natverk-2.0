@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     bind_conf_dir: str = "/etc/bind"
     bind_zones_dir: str = "/etc/bind/zones"
 
+    # Krill RPKI
+    krill_url: str = "https://krill:3000"
+    krill_auth_token: str = "change-me-krill-token"
+
     class Config:
         env_file = ".env"
 

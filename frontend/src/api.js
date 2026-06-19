@@ -130,4 +130,18 @@ export const api = {
   saveAcl:         (data) => request('/bindconfig/acl', { method: 'PUT', body: JSON.stringify(data) }),
   getBindBloqueios:  () => request('/bindconfig/bloqueios'),
   saveBindBloqueios: (content) => request('/bindconfig/bloqueios', { method: 'PUT', body: JSON.stringify({ content }) }),
+
+  // Krill RPKI
+  krillStatus:        () => request('/krill/status'),
+  krillCas:           () => request('/krill/cas'),
+  krillCreateCa:      (handle) => request('/krill/cas', { method: 'POST', body: JSON.stringify({ handle }) }),
+  krillGetCa:         (ca) => request(`/krill/cas/${ca}`),
+  krillChildRequest:  (ca) => request(`/krill/cas/${ca}/child-request`),
+  krillAddParent:     (ca, handle, response_xml) => request(`/krill/cas/${ca}/parent`, { method: 'POST', body: JSON.stringify({ handle, response_xml }) }),
+  krillRepoRequest:   (ca) => request(`/krill/cas/${ca}/repo-request`),
+  krillConfigureRepo: (ca, response_xml) => request(`/krill/cas/${ca}/repo`, { method: 'POST', body: JSON.stringify({ response_xml }) }),
+  krillRoas:          (ca) => request(`/krill/cas/${ca}/roas`),
+  krillAddRoa:        (ca, roa) => request(`/krill/cas/${ca}/roas`, { method: 'POST', body: JSON.stringify(roa) }),
+  krillRemoveRoa:     (ca, roa) => request(`/krill/cas/${ca}/roas`, { method: 'DELETE', body: JSON.stringify(roa) }),
+  krillBgp:           (ca) => request(`/krill/cas/${ca}/bgp`),
 }

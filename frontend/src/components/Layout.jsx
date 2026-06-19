@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Activity, Terminal, ShieldOff, ShieldCheck,
   ClipboardList, Users, Wrench, HardDrive, FileText, UserCircle,
-  LogOut, Sun, Moon, Server,
+  LogOut, Sun, Moon, Server, Globe,
 } from 'lucide-react'
 import { useState } from 'react'
 import { clearToken } from '../api'
@@ -17,6 +17,7 @@ const navItems = [
   { to: '/whitelist',  icon: ShieldCheck,       label: 'Whitelist' },
   { to: '/tools',      icon: Wrench,            label: 'Ferramentas' },
   { to: '/bindconfig', icon: Server,             label: 'Configurar DNS' },
+  { to: '/rpki',       icon: Globe,              label: 'RPKI'     },
   { to: '/bindlog',    icon: FileText,           label: 'Log DNS'  },
   { to: '/backups',    icon: HardDrive,          label: 'Backups' },
   { to: '/users',      icon: Users,             label: 'Usuários' },
