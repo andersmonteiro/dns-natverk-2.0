@@ -162,6 +162,59 @@ async def top_clients_by_type(
     return result
 
 
+@router.get("/queries/timeseries-by-type")
+async def queries_timeseries_by_type(
+    range: str = Query("24h"),
+    bucket: str = Query("1h"),
+    user=Depends(get_current_user)
+):
+    """Série temporal com contagem por qtype em cada bucket."""
+    since = _range_to_ts(range)
+    bucket_secs = {"5m": 300, "15m": 900, "1h": 3600, "6h": 21600, "1d": 86400}.get(bucket, 3600)
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("""
+            SELECT (ts / ?) * ? AS bucket, qtype, COUNT(*) as count
+            FROM dns_query WHERE ts >= ?
+            GROUP BY bucket, qtype ORDER BY bucket
+        """, (bucket_secs, bucket_secs, since))
+        rows = await cursor.fetchall()
+
+    from collections import defaultdict
+    data: dict = defaultdict(dict)
+    qtypes_seen: set = set()
+    for r in rows:
+        data[r["bucket"]][r["qtype"]] = r["count"]
+        qtypes_seen.add(r["qtype"])
+
+    result = []
+    for ts_bucket in sorted(data.keys()):
+        entry = {"ts": ts_bucket}
+        for qt in qtypes_seen:
+            entry[qt] = data[ts_bucket].get(qt, 0)
+        result.append(entry)
+    return result
+
+
+@router.get("/queries/by-hour")
+async def queries_by_hour(range: str = Query("24h"), user=Depends(get_current_user)):
+    """Distribuição de queries por hora do dia (0–23)."""
+    since = _range_to_ts(range)
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("""
+            SELECT CAST(strftime('%H', datetime(ts, 'unixepoch', 'localtime')) AS INTEGER) as hour,
+                   COUNT(*) as count
+            FROM dns_query WHERE ts >= ?
+            GROUP BY hour ORDER BY hour
+        """, (since,))
+        rows = await cursor.fetchall()
+
+    counts = {r["hour"]: r["count"] for r in rows}
+    return [{"hour": h, "label": f"{h:02d}h", "count": counts.get(h, 0)} for h in range(24)]
+
+
 @router.get("/clients/unique")
 async def unique_clients(range: str = Query("24h"), user=Depends(get_current_user)):
     since = _range_to_ts(range)
