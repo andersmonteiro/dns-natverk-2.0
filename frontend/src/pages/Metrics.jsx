@@ -160,8 +160,10 @@ export default function Metrics() {
           title="Distribuição por Hora do Dia"
           subtitle={peakHour ? `pico às ${peakHour.label} (${fmt(peakHour.count)} queries)` : `últimas ${range}`}
         >
-          {hourData.every(h => h.count === 0)
-            ? <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sem dados</span>
+          {hourData.length === 0 || hourData.every(h => h.count === 0)
+            ? <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                Sem dados — use um range maior (24h ou mais) para ver a distribuição por hora
+              </span>
             : <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={hourData} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
