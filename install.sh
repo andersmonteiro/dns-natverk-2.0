@@ -88,23 +88,8 @@ cd "$INSTALL_DIR"
 # Detecta IPs públicos no HOST (tem acesso às interfaces reais)
 info "Detectando IPs públicos do servidor..."
 
-PUBLIC_IPV4=""
-for _url in "https://api.ipify.org" "https://ipv4.icanhazip.com" "https://v4.ident.me"; do
-  _r=$(curl -s -4 --max-time 5 "$_url" 2>/dev/null)
-  [ -n "$_r" ] && { PUBLIC_IPV4="$_r"; break; }
-done
-[ -z "$PUBLIC_IPV4" ] && PUBLIC_IPV4=$(ip -4 addr show scope global \
-  | awk '/inet /{sub(/\/[0-9]+$/,"",$2); print $2; exit}')
-[ -z "$PUBLIC_IPV4" ] && PUBLIC_IPV4=$(hostname -I | awk '{print $1}')
-
-PUBLIC_IPV6=""
-for _url in "https://api6.ipify.org" "https://ipv6.icanhazip.com" "https://v6.ident.me"; do
-  _r=$(curl -s -6 --max-time 5 "$_url" 2>/dev/null)
-  [ -n "$_r" ] && { PUBLIC_IPV6="$_r"; break; }
-done
-# Fallback: lê direto da interface (funciona mesmo sem rota IPv6 pública)
-[ -z "$PUBLIC_IPV6" ] && PUBLIC_IPV6=$(ip -6 addr show scope global \
-  | awk '/inet6/{sub(/\/[0-9]+$/,"",$2); if ($2 !~ /^fe80/) {print $2; exit}}')
+PUBLIC_IPV4=$(curl -s --max-time 5 ifconfig.me -4 2>/dev/null || hostname -I | awk '{print $1}')
+PUBLIC_IPV6=$(curl -s --max-time 5 ifconfig.me -6 2>/dev/null || true)
 
 [ -n "$PUBLIC_IPV4" ] && info "IPv4 detectado: $PUBLIC_IPV4" || warn "IPv4 não detectado"
 [ -n "$PUBLIC_IPV6" ] && info "IPv6 detectado: $PUBLIC_IPV6" || warn "IPv6 não detectado"
