@@ -57,6 +57,7 @@ export const api = {
   timeseries: (range, bucket) => request(`/metrics/queries/timeseries?range=${range}&bucket=${bucket}`),
   total: (range) => request(`/metrics/queries/total?range=${range}`),
   topClients: (range, limit = 10) => request(`/metrics/clients/top?range=${range}&limit=${limit}`),
+  topClientsByType: (range, limit = 20) => request(`/metrics/clients/top-by-type?range=${range}&limit=${limit}`),
   topDomains: (range, limit = 20) => request(`/metrics/domains/top?range=${range}&limit=${limit}`),
   qtypes: (range) => request(`/metrics/qtypes?range=${range}`),
   uniqueClients: (range) => request(`/metrics/clients/unique?range=${range}`),

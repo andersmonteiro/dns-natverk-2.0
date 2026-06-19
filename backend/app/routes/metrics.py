@@ -119,6 +119,49 @@ async def query_types(range: str = Query("24h"), user=Depends(get_current_user))
     return [{"type": r["qtype"], "count": r["count"]} for r in rows]
 
 
+@router.get("/clients/top-by-type")
+async def top_clients_by_type(
+    range: str = Query("24h"),
+    limit: int = Query(20),
+    user=Depends(get_current_user)
+):
+    """Retorna top clientes com contagem por tipo de query (A, AAAA, NS, etc.)."""
+    since = _range_to_ts(range)
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        # Top IPs por volume total
+        cursor = await db.execute("""
+            SELECT client_ip, COUNT(*) as total
+            FROM dns_query WHERE ts >= ?
+            GROUP BY client_ip ORDER BY total DESC LIMIT ?
+        """, (since, limit))
+        top_ips = [r["client_ip"] for r in await cursor.fetchall()]
+
+        if not top_ips:
+            return []
+
+        # Breakdown por tipo para cada IP
+        placeholders = ','.join('?' * len(top_ips))
+        cursor = await db.execute(f"""
+            SELECT client_ip, qtype, COUNT(*) as count
+            FROM dns_query
+            WHERE ts >= ? AND client_ip IN ({placeholders})
+            GROUP BY client_ip, qtype
+        """, (since, *top_ips))
+        rows = await cursor.fetchall()
+
+    from collections import defaultdict
+    data: dict = defaultdict(dict)
+    for r in rows:
+        data[r["client_ip"]][r["qtype"]] = r["count"]
+
+    result = []
+    for ip in top_ips:
+        entry = {"ip": ip, "total": sum(data[ip].values()), **data[ip]}
+        result.append(entry)
+    return result
+
+
 @router.get("/clients/unique")
 async def unique_clients(range: str = Query("24h"), user=Depends(get_current_user)):
     since = _range_to_ts(range)

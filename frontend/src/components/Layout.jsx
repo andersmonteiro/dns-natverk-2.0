@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Activity, Terminal, ShieldOff, ShieldCheck,
   ClipboardList, Users, Wrench, HardDrive, FileText, UserCircle,
-  LogOut, Sun, Moon, Server, Globe, ChevronDown, Wifi,
+  LogOut, Sun, Moon, Server, Globe, ChevronDown, Wifi, ShieldCheck as ShieldIcon,
 } from 'lucide-react'
 import { useState } from 'react'
 import { clearToken } from '../api'
@@ -18,9 +18,12 @@ const DNS_ITEMS = [
   { to: '/blocklist',  icon: ShieldOff,         label: 'Bloqueios'      },
   { to: '/whitelist',  icon: ShieldCheck,       label: 'Whitelist'      },
   { to: '/bindconfig', icon: Server,            label: 'Configurar DNS' },
-  { to: '/rpki',       icon: Globe,             label: 'RPKI'           },
   { to: '/bindlog',    icon: FileText,          label: 'Log DNS'        },
   { to: '/backups',    icon: HardDrive,         label: 'Backups'        },
+]
+
+const RPKI_ITEMS = [
+  { to: '/rpki', icon: Globe, label: 'RPKI' },
 ]
 
 const SISTEMA_ITEMS = [
@@ -38,16 +41,16 @@ function NavItem({ to, icon: Icon, label }) {
   return (
     <NavLink to={to} style={({ isActive }) => ({
       display: 'flex', alignItems: 'center', gap: 10,
-      padding: '8px 12px',
+      padding: '10px 14px',
       borderRadius: 'var(--r-md)',
       textDecoration: 'none',
-      fontSize: 13, fontWeight: 500,
+      fontSize: 14, fontWeight: 500,
       color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
       background: isActive ? 'var(--accent-dim)' : 'transparent',
       borderLeft: isActive ? '3px solid var(--accent)' : '3px solid transparent',
       transition: 'all .15s',
     })}>
-      <Icon size={15} />
+      <Icon size={16} />
       {label}
     </NavLink>
   )
@@ -117,6 +120,7 @@ export default function Layout() {
         {/* Nav */}
         <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 0, overflowY: 'auto' }}>
           <NavGroup label="DNS" icon={Wifi} items={DNS_ITEMS} defaultOpen={true} />
+          <NavGroup label="RPKI" icon={Globe} items={RPKI_ITEMS} defaultOpen={true} />
           <NavGroup label="Sistema" icon={Wrench} items={SISTEMA_ITEMS} defaultOpen={true} />
           <NavGroup label="Admin" icon={Users} items={ADMIN_ITEMS} defaultOpen={true} />
         </nav>
