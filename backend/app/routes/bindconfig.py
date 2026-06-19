@@ -72,13 +72,7 @@ def _sync_acl_from_options(content: str) -> None:
         acl['allow_query'] = aq
         changed = True
 
-    # listen-on port 53 { ip; ip; }
-    m = re.search(r'listen-on\s+port\s+53\s*\{([^}]*)\}', content, re.DOTALL)
-    if m:
-        lo = re.findall(_IP_RE + r'\s*;', m.group(1))
-        if lo:
-            acl['listen_on'] = lo
-            changed = True
+    # listen-on NÃO é sincronizado — dentro do Docker deve ser sempre "any"
 
     if changed:
         ACL_FILE.write_text(json.dumps(acl, indent=2))
@@ -96,7 +90,6 @@ def _load_acl() -> dict:
 def _build_options_from_acl(acl: dict) -> str:
     aq   = "\n".join(f"        {n};" for n in acl.get("allow_query", []))
     fwd  = "\n".join(f"        {n};" for n in acl.get("forwarders", []))
-    listen = " ".join(f"{ip};" for ip in acl.get("listen_on", ["any"]))
     dnssec = acl.get("dnssec_validation", "auto")
     version = '"not disclosed"' if acl.get("version_hidden", True) else '"bind"'
     anx  = "no" if not acl.get("auth_nxdomain", False) else "yes"
@@ -105,7 +98,8 @@ def _build_options_from_acl(acl: dict) -> str:
 options {{
     directory "/var/cache/bind";
 
-    listen-on port 53 {{ {listen} }};
+    // Dentro do Docker o BIND deve escutar em todas as interfaces do container
+    listen-on port 53 {{ any; }};
     listen-on-v6 port 53 {{ any; }};
 
     // Redes autorizadas a fazer consultas DNS neste servidor
@@ -525,6 +519,23 @@ async def delete_record(name: str, data: DeleteRecord, user=Depends(require_admi
 
 
 # ── named-checkconf ───────────────────────────────────────────────────────────
+
+@router.get("/server-ips")
+async def server_ips(user=Depends(get_current_user)):
+    """Retorna os IPs públicos reais do servidor host (v4 e v6)."""
+    import httpx as _httpx
+    ipv4, ipv6 = None, None
+    async with _httpx.AsyncClient(timeout=5) as c:
+        try:
+            ipv4 = (await c.get("https://api.ipify.org")).text.strip()
+        except Exception:
+            pass
+        try:
+            ipv6 = (await c.get("https://api6.ipify.org")).text.strip()
+        except Exception:
+            pass
+    return {"ipv4": ipv4, "ipv6": ipv6}
+
 
 @router.post("/check")
 async def check_config(user=Depends(require_admin)):

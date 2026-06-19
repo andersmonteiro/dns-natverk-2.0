@@ -126,6 +126,7 @@ export const api = {
   validateBindContent:  (content, filename) => request('/bindconfig/validate', { method: 'POST', body: JSON.stringify({ content, filename }) }),
 
   // ACL / Configurações estruturadas
+  getServerIps:    () => request('/bindconfig/server-ips'),
   getAcl:          () => request('/bindconfig/acl'),
   saveAcl:         (data) => request('/bindconfig/acl', { method: 'PUT', body: JSON.stringify(data) }),
   getBindBloqueios:  () => request('/bindconfig/bloqueios'),

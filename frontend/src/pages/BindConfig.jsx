@@ -177,22 +177,17 @@ function AclEditor() {
   const [loading, setLoading]  = useState(true)
   const [saving, setSaving]    = useState(false)
   const [status, setStatus]    = useState(null)
-  const [ipv4, setIpv4]           = useState('')
-  const [ipv6, setIpv6]           = useState('')
-  const [ipv4Draft, setIpv4Draft] = useState('')
-  const [ipv6Draft, setIpv6Draft] = useState('')
+  const [serverIps, setServerIps] = useState({ ipv4: null, ipv6: null })
   const [newNet, setNewNet]       = useState('')
 
   useEffect(() => {
-    api.getAcl().then(r => {
-      setAcl(r)
-      const lo = r.listen_on || []
-      const v4 = lo.find(x => x !== 'any' && !x.includes(':')) || ''
-      const v6 = lo.find(x => x.includes(':')) || ''
-      setIpv4(v4); setIpv4Draft(v4)
-      setIpv6(v6); setIpv6Draft(v6)
-      setLoading(false)
-    }).catch(() => setLoading(false))
+    Promise.all([api.getAcl(), api.getServerIps()])
+      .then(([acl, ips]) => {
+        setAcl(acl)
+        setServerIps(ips)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
   }, [])
 
   function set(key, val) { setAcl(a => ({ ...a, [key]: val })) }
@@ -209,13 +204,10 @@ function AclEditor() {
   async function save() {
     setSaving(true); setStatus(null)
     try {
-      const listenOn = []
-      if (ipv4) listenOn.push(ipv4)
-      if (ipv6) listenOn.push(ipv6)
       const payload = {
         ...acl,
         allow_query: [...LOCKED_NETWORKS, ...userNetworks],
-        listen_on: listenOn.length ? listenOn : ['any'],
+        listen_on: ['any'],
       }
       const r = await api.saveAcl(payload)
       setStatus({ ok: r.ok, msg: r.output })
@@ -232,49 +224,25 @@ function AclEditor() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-      {/* IP do servidor */}
+      {/* IP do servidor — informativo, detectado automaticamente */}
       <div style={panel}>
         <div style={sectionLabel}>Endereço IP do servidor DNS</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {/* IPv4 */}
           <div>
-            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>IPv4</label>
-            {ipv4
-              ? <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <Chip label={ipv4} onRemove={() => { setIpv4(''); setIpv4Draft('') }} />
-                </div>
-              : <div style={{ display: 'flex', gap: 6 }}>
-                  <input value={ipv4Draft} onChange={e => setIpv4Draft(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (ipv4Draft.trim()) setIpv4(ipv4Draft.trim()) } }}
-                    placeholder="ex: 177.130.50.42"
-                    style={{ ...input, flex: 1 }} />
-                  <button onClick={() => { if (ipv4Draft.trim()) setIpv4(ipv4Draft.trim()) }}
-                    style={btn('primary')}><Plus size={13} /></button>
-                </div>
-            }
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>IPv4</label>
+            {serverIps.ipv4
+              ? <Chip label={serverIps.ipv4} locked />
+              : <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Detectando…</span>}
           </div>
-          {/* IPv6 */}
           <div>
-            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
-              IPv6 <span style={{ opacity: .5 }}>(opcional)</span>
-            </label>
-            {ipv6
-              ? <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <Chip label={ipv6} onRemove={() => { setIpv6(''); setIpv6Draft('') }} />
-                </div>
-              : <div style={{ display: 'flex', gap: 6 }}>
-                  <input value={ipv6Draft} onChange={e => setIpv6Draft(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (ipv6Draft.trim()) setIpv6(ipv6Draft.trim()) } }}
-                    placeholder="ex: 2804:235c::1"
-                    style={{ ...input, flex: 1 }} />
-                  <button onClick={() => { if (ipv6Draft.trim()) setIpv6(ipv6Draft.trim()) }}
-                    style={btn('primary')}><Plus size={13} /></button>
-                </div>
-            }
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>IPv6</label>
+            {serverIps.ipv6
+              ? <Chip label={serverIps.ipv6} locked />
+              : <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Não detectado</span>}
           </div>
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
-          Deixe em branco para escutar em todas as interfaces (any).
+          IPs públicos detectados automaticamente. Configure seus clientes para usar estes endereços como servidor DNS.
         </div>
       </div>
 
