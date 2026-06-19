@@ -84,6 +84,20 @@ fi
 cd "$INSTALL_DIR"
 
 # ── 4. Arquivo .env ───────────────────────────────────────────────────────────
+
+# Detecta IPs públicos no HOST (tem acesso às interfaces reais)
+info "Detectando IPs públicos do servidor..."
+PUBLIC_IPV4=$(curl -s -4 --max-time 5 https://api.ipify.org 2>/dev/null \
+  || ip -4 addr show scope global | grep -oP '(?<=inet )\d+\.\d+\.\d+\.\d+' | head -1 \
+  || hostname -I | awk '{print $1}')
+PUBLIC_IPV6=$(curl -s -6 --max-time 5 https://api6.ipify.org 2>/dev/null \
+  || curl -s -6 --max-time 5 https://ipv6.icanhazip.com 2>/dev/null \
+  || ip -6 addr show scope global | grep -oP '(?<=inet6 )[\da-f:]+' | grep -v '^fe80' | head -1 \
+  || true)
+
+[ -n "$PUBLIC_IPV4" ] && info "IPv4 detectado: $PUBLIC_IPV4" || warn "IPv4 não detectado"
+[ -n "$PUBLIC_IPV6" ] && info "IPv6 detectado: $PUBLIC_IPV6" || warn "IPv6 não detectado"
+
 if [ ! -f .env ]; then
   info "Gerando arquivo .env..."
   cp .env.example .env
@@ -96,26 +110,35 @@ if [ ! -f .env ]; then
   KRILL_TOKEN=$(openssl rand -hex 32)
   sed -i "s/changeme-krill-token/$KRILL_TOKEN/" .env
 
-  # Detecta IP público para o FQDN do Krill
-  PUBLIC_IP=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')
-  sed -i "s/SEU_IP_OU_DOMINIO_AQUI/$PUBLIC_IP/" .env
+  # FQDN do Krill
+  sed -i "s/SEU_IP_OU_DOMINIO_AQUI/${PUBLIC_IPV4:-localhost}/" .env
 
   success "Arquivo .env criado (SECRET_KEY, KRILL_AUTH_TOKEN e KRILL_FQDN configurados)."
-  info "KRILL_FQDN detectado como: $PUBLIC_IP (edite .env se precisar usar um domínio)"
 else
   warn ".env já existe — mantendo configuração atual."
   # Adiciona variáveis do Krill se não existirem (upgrade de instalações antigas)
   if ! grep -q "KRILL_AUTH_TOKEN" .env; then
     KRILL_TOKEN=$(openssl rand -hex 32)
-    PUBLIC_IP=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')
     echo "" >> .env
     echo "# Krill RPKI (adicionado pelo instalador)" >> .env
     echo "KRILL_AUTH_TOKEN=$KRILL_TOKEN" >> .env
-    echo "KRILL_FQDN=$PUBLIC_IP" >> .env
+    echo "KRILL_FQDN=${PUBLIC_IPV4:-localhost}" >> .env
     echo "TZ=America/Sao_Paulo" >> .env
-    info "Variáveis do Krill adicionadas ao .env existente. KRILL_FQDN=$PUBLIC_IP"
+    info "Variáveis do Krill adicionadas ao .env existente."
   fi
 fi
+
+# Atualiza / insere SERVER_IPV4 e SERVER_IPV6 no .env (sempre, para refletir detecção atual)
+_upsert_env() {
+  local key="$1" val="$2"
+  if grep -q "^${key}=" .env 2>/dev/null; then
+    sed -i "s|^${key}=.*|${key}=${val}|" .env
+  else
+    echo "${key}=${val}" >> .env
+  fi
+}
+_upsert_env "SERVER_IPV4" "${PUBLIC_IPV4:-}"
+_upsert_env "SERVER_IPV6" "${PUBLIC_IPV6:-}"
 
 # ── 5. Certificado SSL ────────────────────────────────────────────────────────
 mkdir -p nginx/certs

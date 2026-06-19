@@ -224,26 +224,30 @@ function AclEditor() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-      {/* IP do servidor — informativo, detectado automaticamente */}
-      <div style={panel}>
-        <div style={sectionLabel}>Endereço IP do servidor DNS</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>IPv4</label>
-            {serverIps.ipv4
-              ? <Chip label={serverIps.ipv4} locked />
-              : <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Detectando…</span>}
+      {/* IP do servidor — cards estilo Dashboard */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        {[
+          { label: 'IPv4 do Servidor DNS', value: serverIps.ipv4, loading: loading },
+          { label: 'IPv6 do Servidor DNS', value: serverIps.ipv6, loading: loading },
+        ].map(({ label, value, loading: ld }) => (
+          <div key={label} style={{
+            background: 'var(--bg-panel)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--r-lg)',
+            padding: '16px 18px',
+            display: 'flex', flexDirection: 'column', gap: 4,
+          }}>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.6px', fontWeight: 600 }}>
+              {label}
+            </span>
+            <div style={{ fontSize: 20, fontWeight: 700, color: value ? 'var(--accent)' : 'var(--text-muted)', letterSpacing: '-0.5px', lineHeight: 1.3, wordBreak: 'break-all' }}>
+              {ld ? '…' : (value || '—')}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              {value ? 'Detectado automaticamente' : 'Não detectado'}
+            </div>
           </div>
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>IPv6</label>
-            {serverIps.ipv6
-              ? <Chip label={serverIps.ipv6} locked />
-              : <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Não detectado</span>}
-          </div>
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
-          IPs públicos detectados automaticamente. Configure seus clientes para usar estes endereços como servidor DNS.
-        </div>
+        ))}
       </div>
 
       {/* Redes autorizadas */}

@@ -47,6 +47,8 @@ services:
       - COLLECTOR_ENABLED=${COLLECTOR_ENABLED:-true}
       - KRILL_URL=${KRILL_URL:-https://krill:3000}
       - KRILL_AUTH_TOKEN=${KRILL_AUTH_TOKEN:-change-me-krill-token}
+      - SERVER_IPV4=${SERVER_IPV4:-}
+      - SERVER_IPV6=${SERVER_IPV6:-}
 
   frontend:
     build: ./frontend

@@ -522,19 +522,33 @@ async def delete_record(name: str, data: DeleteRecord, user=Depends(require_admi
 
 @router.get("/server-ips")
 async def server_ips(user=Depends(get_current_user)):
-    """Retorna os IPs públicos reais do servidor host (v4 e v6)."""
+    """Retorna os IPs públicos reais do servidor host (v4 e v6).
+
+    Prioridade: variáveis de ambiente SERVER_IPV4 / SERVER_IPV6 (injetadas
+    pelo install.sh que roda no host e tem acesso direto às interfaces).
+    Fallback: serviços externos (só funciona se o container tiver rota IPv6).
+    """
     import httpx as _httpx
-    ipv4, ipv6 = None, None
-    async with _httpx.AsyncClient(timeout=5) as c:
-        try:
-            ipv4 = (await c.get("https://api.ipify.org")).text.strip()
-        except Exception:
-            pass
-        try:
-            ipv6 = (await c.get("https://api6.ipify.org")).text.strip()
-        except Exception:
-            pass
-    return {"ipv4": ipv4, "ipv6": ipv6}
+
+    ipv4 = os.environ.get("SERVER_IPV4") or None
+    ipv6 = os.environ.get("SERVER_IPV6") or None
+
+    if not ipv4 or not ipv6:
+        async with _httpx.AsyncClient(timeout=5) as c:
+            if not ipv4:
+                try:
+                    ipv4 = (await c.get("https://api.ipify.org")).text.strip()
+                except Exception:
+                    pass
+            if not ipv6:
+                for url in ["https://api6.ipify.org", "https://ipv6.icanhazip.com", "https://v6.ident.me"]:
+                    try:
+                        ipv6 = (await c.get(url)).text.strip()
+                        break
+                    except Exception:
+                        pass
+
+    return {"ipv4": ipv4 or None, "ipv6": ipv6 or None}
 
 
 @router.post("/check")
