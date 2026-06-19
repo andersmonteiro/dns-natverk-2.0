@@ -11,10 +11,11 @@ from collections import deque
 from ..config import settings
 from ..db import DB_PATH
 
-# Formato padrão do BIND9 querylog com print-category/print-severity
-# Ex: 17-Jun-2026 14:32:10.123 queries: info: client @0x... 192.168.1.1#54321 (google.com): query: google.com IN A + (127.0.0.1)
+# Formato do BIND9 querylog — severity (info:) é opcional dependendo da config
+# Ex sem severity: 19-Jun-2026 13:38:32.968 queries: client @0x... 38.50.57.240#55370 (google.com): query: google.com IN A + (127.0.0.1)
+# Ex com severity: 17-Jun-2026 14:32:10.123 queries: info: client @0x... 192.168.1.1#54321 (google.com): query: google.com IN A + (127.0.0.1)
 LINE_RE = re.compile(
-    r"queries: info: client\s+(?:@\S+\s+)?(?P<ip>\d+\.\d+\.\d+\.\d+)#\d+\s+"
+    r"queries:(?:\s+\w+:)?\s+client\s+(?:@\S+\s+)?(?P<ip>[\da-fA-F:\.]+)#\d+\s+"
     r"\((?P<qname>[^)]+)\): query: \S+ IN (?P<qtype>\w+)"
 )
 
