@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts'
 import { api } from '../api'
 import Panel from '../components/Panel'
 import TimeRange from '../components/TimeRange'
@@ -39,15 +39,18 @@ export default function Metrics() {
   const [range, setRange]     = useState('1h')
   const [clients, setClients] = useState([])
   const [domains, setDomains] = useState([])
+  const [qtypeData, setQtypeData] = useState([])
 
   const load = useCallback(async () => {
     try {
-      const [c, d] = await Promise.all([
+      const [c, d, q] = await Promise.all([
         api.topClientsByType(range, 20),
         api.topDomains(range, 20),
+        api.qtypes(range),
       ])
       setClients(c)
       setDomains(d)
+      setQtypeData(q)
     } catch {}
   }, [range])
 
@@ -75,12 +78,12 @@ export default function Metrics() {
         </div>
       </div>
 
-      {/* Top Clientes — barras empilhadas por tipo */}
-      <Panel title="Top 20 Clientes por Volume" subtitle={`últimas ${range}`}>
-        {clients.length === 0
-          ? <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sem dados</span>
-          : <>
-              <ResponsiveContainer width="100%" height={Math.max(220, clients.length * 36)}>
+      {/* Top Clientes + Top Tipos — lado a lado */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, alignItems: 'start' }}>
+        <Panel title="Top 20 Clientes por Volume" subtitle={`últimas ${range}`}>
+          {clients.length === 0
+            ? <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sem dados</span>
+            : <ResponsiveContainer width="100%" height={Math.max(220, clients.length * 36)}>
                 <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20, top: 4, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
                   <XAxis type="number" tickFormatter={fmt}
@@ -101,9 +104,55 @@ export default function Metrics() {
                   ))}
                 </BarChart>
               </ResponsiveContainer>
-            </>
-        }
-      </Panel>
+          }
+        </Panel>
+
+        <Panel title="Top Tipos de Query" subtitle={`últimas ${range}`}>
+          {qtypeData.length === 0
+            ? <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sem dados</span>
+            : <>
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie
+                      data={qtypeData}
+                      dataKey="count"
+                      nameKey="type"
+                      cx="50%" cy="50%"
+                      innerRadius={55}
+                      outerRadius={95}
+                      paddingAngle={2}
+                      label={({ type, percent }) => percent > 0.04 ? `${type} ${(percent * 100).toFixed(0)}%` : ''}
+                      labelLine={false}
+                    >
+                      {qtypeData.map((entry, i) => (
+                        <Cell key={entry.type} fill={typeColor(entry.type, i)} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(v, name) => [fmt(v), name]}
+                      contentStyle={{ background: 'var(--bg-panel-2)', border: '1px solid var(--border-2)', borderRadius: 6, fontSize: 12 }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
+                  {qtypeData.map((entry, i) => {
+                    const total = qtypeData.reduce((s, e) => s + e.count, 0)
+                    const pct = total > 0 ? (entry.count / total * 100).toFixed(1) : 0
+                    return (
+                      <div key={entry.type} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                        <span style={{ width: 10, height: 10, borderRadius: 2, background: typeColor(entry.type, i), flexShrink: 0 }} />
+                        <span style={{ flex: 1, color: 'var(--text-secondary)', fontFamily: 'monospace' }}>{entry.type}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>{pct}%</span>
+                        <span style={{ color: 'var(--accent)', minWidth: 40, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt(entry.count)}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+          }
+        </Panel>
+      </div>
 
       {/* Top Domínios */}
       <Panel title="Top 20 Domínios Consultados" subtitle={`últimas ${range}`}>
@@ -113,15 +162,13 @@ export default function Metrics() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr>
-                    {['#', 'Domínio', 'Consultas', 'Barra'].map(h => (
+                    {['#', 'Domínio', 'Consultas'].map(h => (
                       <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--text-muted)', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.5px', borderBottom: '1px solid var(--border)' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {domains.map((d, i) => {
-                    const max = domains[0]?.count || 1
-                    const pct = Math.round(d.count / max * 100)
                     return (
                       <tr key={d.domain} style={{ borderBottom: '1px solid var(--border)' }}
                         onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
@@ -130,11 +177,6 @@ export default function Metrics() {
                         <td style={{ padding: '8px 10px', color: 'var(--text-muted)', width: 32 }}>{i + 1}</td>
                         <td style={{ padding: '8px 10px', color: 'var(--text-primary)', fontFamily: 'monospace', fontSize: 12 }}>{d.domain}</td>
                         <td style={{ padding: '8px 10px', color: 'var(--accent)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{fmt(d.count)}</td>
-                        <td style={{ padding: '8px 10px', width: 200 }}>
-                          <div style={{ height: 6, background: 'var(--bg-panel-2)', borderRadius: 3, overflow: 'hidden' }}>
-                            <div style={{ width: `${pct}%`, height: '100%', background: DOMAIN_COLORS[i % DOMAIN_COLORS.length], borderRadius: 3, transition: 'width .3s' }} />
-                          </div>
-                        </td>
                       </tr>
                     )
                   })}

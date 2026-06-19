@@ -69,7 +69,7 @@ function NavGroup({ label, icon: Icon, items, defaultOpen = true }) {
           display: 'flex', alignItems: 'center', gap: 8,
           width: '100%', padding: '6px 12px 6px 10px',
           background: 'transparent', border: 'none',
-          cursor: 'pointer', fontSize: 10, fontWeight: 700,
+          cursor: 'pointer', fontSize: 12, fontWeight: 700,
           color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.8px',
           marginBottom: 2,
         }}
@@ -127,7 +127,6 @@ export default function Layout() {
 
         {/* Footer */}
         <div style={{ padding: '12px 8px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <NavItem to="/profile" icon={UserCircle} label="Perfil" />
           <button onClick={logout} style={{
             display: 'flex', alignItems: 'center', gap: 10,
             width: '100%', padding: '8px 12px',
@@ -153,6 +152,17 @@ export default function Layout() {
           padding: '0 20px', gap: 10, flexShrink: 0,
         }}>
           <Clock />
+          <NavLink to="/profile" title="Perfil" style={({ isActive }) => ({
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 32, height: 32,
+            background: isActive ? 'var(--accent-dim)' : 'var(--bg-panel-2)',
+            border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
+            borderRadius: 'var(--r-sm)',
+            color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
+            textDecoration: 'none',
+          })}>
+            <UserCircle size={15} />
+          </NavLink>
           <button
             onClick={toggle}
             title={theme === 'dark' ? 'Mudar para claro' : 'Mudar para escuro'}
