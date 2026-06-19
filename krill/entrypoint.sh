@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
 # Gera /etc/krill.conf a partir do template substituindo variáveis de ambiente

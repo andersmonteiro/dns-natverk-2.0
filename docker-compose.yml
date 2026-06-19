@@ -28,6 +28,7 @@ services:
     restart: unless-stopped
     depends_on:
       - bind
+      - krill
     cap_add:
       - NET_RAW     # ping, traceroute, mtr direto no container
       - NET_ADMIN   # traceroute/mtr precisam de raw sockets

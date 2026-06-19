@@ -1,12 +1,12 @@
 # Krill RPKI CA — gerado pelo entrypoint a partir de variáveis de ambiente
-ip             = "0.0.0.0"
-port           = 3000
-data_dir       = "/var/krill/data"
-auth_token     = "${KRILL_AUTH_TOKEN}"
+ip         = "0.0.0.0"
+port       = 3000
+data_dir   = "/var/krill/data"
+auth_token = "${KRILL_AUTH_TOKEN}"
 
-# URIs públicas — devem apontar para o IP/domínio público do servidor
-rsync_base       = "rsync://${KRILL_FQDN}/repo/"
-rrdp_service_uri = "https://${KRILL_FQDN}/rrdp/"
+# URI base pública (usado pelo Krill >= 0.12)
+# Quando não integrado ao registro.br ainda, aponta para localhost
+service_uri = "https://${KRILL_FQDN}/"
 
 log_level = "info"
 log_type  = "stderr"
