@@ -2,9 +2,8 @@ FROM nlnetlabs/krill:latest
 
 USER root
 
-# gettext-base fornece envsubst para substituição de variáveis no template
-RUN apt-get update && apt-get install -y --no-install-recommends gettext-base \
-    && rm -rf /var/lib/apt/lists/*
+# gettext fornece envsubst para substituição de variáveis no template (Alpine)
+RUN apk add --no-cache gettext
 
 COPY krill.conf.template /etc/krill.conf.template
 COPY entrypoint.sh /entrypoint-natverk.sh
