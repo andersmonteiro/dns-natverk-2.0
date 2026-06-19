@@ -69,20 +69,19 @@ export default function Metrics() {
 
   const load = useCallback(async () => {
     const bucket = bucketFor(range)
-    try {
-      const [c, d, q, ts, hr] = await Promise.all([
-        api.topClientsByType(range, 20),
-        api.topDomains(range, 20),
-        api.qtypes(range),
-        api.timeseriesByType(range, bucket),
-        api.queriesByHour(range),
-      ])
-      setClients(c)
-      setDomains(d)
-      setQtypeData(q)
-      setTsData(ts)
-      setHourData(hr)
-    } catch {}
+    const safe = (p) => p.catch(() => null)
+    const [c, d, q, ts, hr] = await Promise.all([
+      safe(api.topClientsByType(range, 20)),
+      safe(api.topDomains(range, 20)),
+      safe(api.qtypes(range)),
+      safe(api.timeseriesByType(range, bucket)),
+      safe(api.queriesByHour(range)),
+    ])
+    if (c) setClients(c)
+    if (d) setDomains(d)
+    if (q) setQtypeData(q)
+    if (ts) setTsData(ts)
+    if (hr) setHourData(hr)
   }, [range])
 
   const { tick } = useRefresh()
