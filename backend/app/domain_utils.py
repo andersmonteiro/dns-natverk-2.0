@@ -51,14 +51,18 @@ def is_whitelisted(domain: str, whitelist: set) -> bool:
     Verifica se o domínio está protegido pela whitelist.
     Faz correspondência exata E por sufixo (subdomínios também são protegidos).
     Ex: whitelist={'natverk.com.br'} → 'mail.natverk.com.br' também é protegido.
+
+    IMPORTANTE: TLDs (com.br, com, net etc.) na whitelist NÃO protegem todos os
+    seus subdomínios via suffix matching — eles já são tratados por is_tld_protegido().
+    Sem essa regra, colocar 'com.br' na whitelist marcaria TODOS os .com.br como protegidos.
     """
     if domain in whitelist:
         return True
-    # Verifica se algum item da whitelist é pai deste domínio
+    # Verifica se algum domínio pai (não-TLD) da whitelist cobre este domínio
     parts = domain.split(".")
     for i in range(1, len(parts)):
         parent = ".".join(parts[i:])
-        if parent in whitelist:
+        if parent in whitelist and parent not in PROTECTED_TLDS:
             return True
     return False
 
