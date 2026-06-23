@@ -336,33 +336,50 @@ async def ca_details(ca: str, user=Depends(get_current_user)):
             resources["ipv6"] = _str_list(raw_res.get("ipv6", raw_res.get("v6", [])))
 
         # ── repo ─────────────────────────────────────────────────────────────
+        # Campos permitidos para exibição (sem public_key, id_cert, etc.)
+        REPO_SAFE_KEYS = {
+            "service_uri", "sia_base", "base_uri",
+            "rpki_notify", "rrdp_notification_uri",
+            "publisher_handle",
+        }
+
+        def _safe_repo_from(obj: dict) -> dict:
+            """Extrai campos seguros (sem chaves gigantes) de um objeto de repo."""
+            out: dict = {}
+            for k, v in obj.items():
+                if k in REPO_SAFE_KEYS and isinstance(v, (str, int)) and v:
+                    out[str(k)] = str(v)
+                elif isinstance(v, dict):
+                    # desce um nível (ex: "value": {"service_uri": ...})
+                    merged = _safe_repo_from(v)
+                    for mk, mv in merged.items():
+                        if mk not in out:
+                            out[mk] = mv
+            return out
+
         repo: dict = {}
         raw_repo = detail.get("repo_info") or {}
         if isinstance(raw_repo, dict):
-            for k, v in raw_repo.items():
-                if isinstance(v, (str, int)) and v:
-                    repo[str(k)] = str(v)
+            repo.update(_safe_repo_from(raw_repo))
 
         # Enrich with /repo endpoint
         try:
             rd = await _get(f"/cas/{ca}/repo")
             if isinstance(rd, dict):
-                # Varre recursivamente à procura de strings úteis
-                def _flatten(obj, prefix=""):
-                    if isinstance(obj, dict):
-                        for k, v in obj.items():
-                            _flatten(v, k)
-                    elif isinstance(obj, (str, int)) and obj:
-                        if prefix and prefix not in repo and prefix not in ("tag",):
-                            repo[prefix] = str(obj)
-                _flatten(rd)
-                # last_exchange
-                for lex_key in ("last_exchange", "last_cms_msg", "last_response"):
-                    if rd.get(lex_key) is not None:
-                        ts, ok = _extract_lex(rd[lex_key])
-                        if ts:
-                            repo["last_exchange"] = ts
-                            repo["last_ok"]       = ok
+                repo.update(_safe_repo_from(rd))
+                # last_exchange — procura em vários níveis
+                for obj in (rd, rd.get("contact") or {}, rd.get("value") or {}):
+                    if not isinstance(obj, dict):
+                        continue
+                    for lex_key in ("last_exchange", "last_cms_msg", "last_response"):
+                        raw_lex = obj.get(lex_key)
+                        if raw_lex is not None:
+                            ts, ok = _extract_lex(raw_lex)
+                            if ts:
+                                repo["last_exchange"] = ts
+                                repo["last_ok"]       = ok
+                            break
+                    if repo.get("last_exchange"):
                         break
         except Exception:
             pass
@@ -372,7 +389,6 @@ async def ca_details(ca: str, user=Depends(get_current_user)):
             "parents":   parents,
             "resources": resources,
             "repo":      repo,
-            "_debug_parents_raw_type": str(type(raw_parents).__name__),
         }
     except Exception as e:
         return {"handle": ca, "parents": [], "resources": {}, "repo": {}, "error": str(e)}

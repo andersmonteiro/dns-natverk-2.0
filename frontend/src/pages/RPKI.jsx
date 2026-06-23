@@ -620,10 +620,6 @@ function ConfigSection({ cas, onCaCreated }) {
                 </h3>
                 {hasRepo ? (
                   <div>
-                    <div style={{ fontSize: 12, color: 'var(--green)', marginBottom: 4 }}>
-                      <CheckCircle size={13} style={{ marginRight: 6 }} />
-                      Krill pronto para emitir ROAs.
-                    </div>
                     <CaDetailsPanel ca={selectedCa} section="repo" />
                   </div>
                 ) : (
@@ -712,6 +708,10 @@ function ROASection({ ca }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Status Krill */}
+      <div style={{ fontSize: 12, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <CheckCircle size={13} /> Krill pronto para emitir ROAs.
+      </div>
       {/* Formulário add ROA */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'flex-end' }}>
         <div>
