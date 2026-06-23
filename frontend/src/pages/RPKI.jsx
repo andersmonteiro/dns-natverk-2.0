@@ -158,12 +158,12 @@ function StatusSection({ status, loading, onRefresh }) {
               <tr key={ca.handle} style={{ borderBottom: '1px solid var(--border-dim)' }}>
                 <td style={{ padding: '8px 10px', fontWeight: 600, fontFamily: 'monospace' }}>{ca.handle}</td>
                 <td style={{ padding: '8px 10px' }}>
-                  {ca.parents?.length > 0
-                    ? <span style={{ color: 'var(--green)' }}><CheckCircle size={12} style={{ marginRight: 4 }} />{ca.parents[0]}</span>
+                  {ca.parent
+                    ? <span style={{ color: 'var(--green)' }}><CheckCircle size={12} style={{ marginRight: 4 }} />{ca.parent}</span>
                     : <span style={{ color: 'var(--text-muted)' }}>Não configurado</span>}
                 </td>
                 <td style={{ padding: '8px 10px' }}>
-                  {ca.repo_info
+                  {ca.has_repo
                     ? <span style={{ color: 'var(--green)' }}><CheckCircle size={12} style={{ marginRight: 4 }} />Configurado</span>
                     : <span style={{ color: 'var(--text-muted)' }}>Não configurado</span>}
                 </td>
@@ -409,7 +409,7 @@ function ROASection({ ca }) {
     setLoading(true)
     try {
       const r = await api.krillRoas(ca)
-      setRoas(Array.isArray(r) ? r : (r.roas || []))
+      setRoas(Array.isArray(r) ? r : (r.roas ?? r.authorized ?? []))
     } catch (e) {
       setStatus({ ok: false, msg: e.message })
     } finally { setLoading(false) }
