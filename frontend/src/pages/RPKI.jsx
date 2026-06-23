@@ -778,21 +778,14 @@ function ROASection({ ca }) {
   )
 }
 
-// ── Seção: BGP Analysis ───────────────────────────────────────────────────────
+// ── Seção: BGP Analysis (via RIPE RPKI Validator) ────────────────────────────
 
-const BGP_COLOR = {
-  valid:     'var(--green)',
-  invalid:   'var(--red)',
-  not_found: 'var(--orange)',
-}
-const BGP_LABEL = {
-  valid:     'Válido',
-  invalid:   'Inválido',
-  not_found: 'Não encontrado',
-}
+const STATE_COLOR = { Valid: 'var(--green)', Invalid: 'var(--red)', NotFound: 'var(--orange)', Error: 'var(--red)' }
+const STATE_ICON  = { Valid: 'check', Invalid: 'x', NotFound: 'clock', Error: 'x' }
+const STATE_LABEL = { Valid: 'Válido', Invalid: 'Inválido', NotFound: 'Não encontrado', Error: 'Erro' }
 
 function BGPSection({ ca }) {
-  const [data, setData]       = useState(null)
+  const [results, setResults] = useState(null)
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState(null)
 
@@ -801,14 +794,8 @@ function BGPSection({ ca }) {
     setLoading(true); setStatusMsg(null)
     try {
       const r = await api.krillBgp(ca)
-      setData(r)
-      if (r?.error) {
-        // 404 = endpoint não disponível nesta versão do Krill — aviso sutil, não erro
-        const is404 = String(r.error).includes('404')
-        setStatusMsg({ ok: false, warn: is404, msg: is404
-          ? 'Análise BGP não disponível nesta versão do Krill.'
-          : `BGP: ${r.error}` })
-      }
+      setResults(Array.isArray(r?.results) ? r.results : [])
+      if (r?.error) setStatusMsg({ ok: false, msg: `Erro: ${r.error}` })
     } catch (e) {
       setStatusMsg({ ok: false, msg: String(e.message) })
     } finally { setLoading(false) }
@@ -818,49 +805,57 @@ function BGPSection({ ca }) {
 
   if (!ca) return <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Selecione uma CA primeiro.</div>
 
-  const announcements = Array.isArray(data?.announcements) ? data.announcements : []
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+          Fonte: <a href="https://rpki-validator.ripe.net/ui/" target="_blank" rel="noreferrer"
+            style={{ color: 'var(--accent)' }}>RIPE NCC RPKI Validator</a>
+        </span>
         <button onClick={load} disabled={loading} style={btn('ghost')}>
           <RefreshCw size={13} /> Atualizar
         </button>
       </div>
 
       {loading ? (
-        <div style={{ color: 'var(--text-muted)', fontSize: 12 }}><Loader size={14} /> Consultando BGP...</div>
-      ) : announcements.length === 0 ? (
+        <div style={{ color: 'var(--text-muted)', fontSize: 12 }}><Loader size={14} /> Consultando RIPE...</div>
+      ) : results === null ? (
         <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: 24 }}>
-          {data ? 'Nenhum anúncio BGP encontrado para os prefixos desta CA.' : 'Clique em Atualizar para carregar.'}
+          Clique em Atualizar para carregar.
+        </div>
+      ) : results.length === 0 ? (
+        <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: 24 }}>
+          Nenhum ROA configurado para validar.
         </div>
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)' }}>
-              {['Prefixo', 'ASN anunciado', 'Status'].map(h => (
+              {['ASN', 'Prefixo', 'Max Length', 'Status RPKI'].map(h => (
                 <th key={h} style={{ textAlign: 'left', padding: '7px 10px', color: 'var(--text-muted)', fontWeight: 600, fontSize: 11 }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {announcements.map((a, i) => {
-              const state = String(a?.validity?.state || 'not_found')
+            {results.map((r, i) => {
+              const state = r.state || 'NotFound'
+              const color = STATE_COLOR[state] || 'var(--text-muted)'
               return (
                 <tr key={i} style={{ borderBottom: '1px solid var(--border-dim)' }}>
-                  <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>{String(a.prefix ?? '')}</td>
-                  <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>{String(a.asn ?? '')}</td>
+                  <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontWeight: 600 }}>{String(r.asn ?? '')}</td>
+                  <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>{String(r.prefix ?? '')}</td>
+                  <td style={{ padding: '8px 10px', color: 'var(--text-muted)' }}>/{String(r.max_length ?? '')}</td>
                   <td style={{ padding: '8px 10px' }}>
-                    <span style={{
-                      color: BGP_COLOR[state] || 'var(--text-muted)',
-                      fontWeight: 600, fontSize: 11,
-                      display: 'flex', alignItems: 'center', gap: 4,
-                    }}>
-                      {state === 'valid'     && <CheckCircle size={12} />}
-                      {state === 'invalid'   && <XCircle size={12} />}
-                      {state === 'not_found' && <Clock size={12} />}
-                      {BGP_LABEL[state] || state}
+                    <span style={{ color, fontWeight: 600, fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      {state === 'Valid'    && <CheckCircle size={12} />}
+                      {state === 'Invalid'  && <XCircle size={12} />}
+                      {state === 'NotFound' && <Clock size={12} />}
+                      {state === 'Error'    && <XCircle size={12} />}
+                      {STATE_LABEL[state] || state}
                     </span>
+                    {r.description && state !== 'Valid' && (
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{r.description}</div>
+                    )}
                   </td>
                 </tr>
               )
