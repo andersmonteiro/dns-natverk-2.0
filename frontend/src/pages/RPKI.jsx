@@ -1,9 +1,49 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Component } from 'react'
 import {
   ShieldCheck, ChevronDown, Copy, Check, Upload, Plus, Trash2,
   RefreshCw, AlertCircle, CheckCircle, XCircle, Clock, Loader,
 } from 'lucide-react'
 import { api } from '../api'
+
+// ── Error Boundary ────────────────────────────────────────────────────────────
+
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { error: null }
+  }
+  static getDerivedStateFromError(error) {
+    return { error }
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{
+          padding: '20px', margin: '20px 0',
+          background: 'rgba(239,68,68,.1)', border: '1px solid var(--red)',
+          borderRadius: 'var(--r-md)', color: 'var(--red)', fontSize: 13,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, marginBottom: 8 }}>
+            <XCircle size={16} /> Erro na página RPKI
+          </div>
+          <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap', opacity: 0.85, margin: 0 }}>
+            {this.state.error?.message}
+          </pre>
+          <button
+            onClick={() => this.setState({ error: null })}
+            style={{
+              marginTop: 12, padding: '6px 14px', borderRadius: 'var(--r-sm)',
+              background: 'var(--red)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12,
+            }}
+          >
+            Tentar novamente
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -39,7 +79,7 @@ function StatusBadge({ ok, msg }) {
       fontSize: 12, whiteSpace: 'pre-wrap',
     }}>
       {ok ? <CheckCircle size={13} style={{ marginRight: 6 }} /> : <XCircle size={13} style={{ marginRight: 6 }} />}
-      {msg}
+      {String(msg)}
     </div>
   )
 }
@@ -92,11 +132,11 @@ function CollapsibleSection({ title, icon: Icon, badge, children, defaultOpen = 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {Icon && <Icon size={15} color="var(--accent)" />}
           <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{title}</span>
-          {badge && (
+          {badge != null && (
             <span style={{
               fontSize: 10, fontWeight: 700, padding: '2px 7px',
               borderRadius: 10, background: 'var(--accent-dim)', color: 'var(--accent)',
-            }}>{badge}</span>
+            }}>{String(badge)}</span>
           )}
         </div>
         <ChevronDown size={15} color="var(--text-muted)"
@@ -112,26 +152,25 @@ function CollapsibleSection({ title, icon: Icon, badge, children, defaultOpen = 
 function StatusSection({ status, loading, onRefresh }) {
   if (loading) return <div style={{ color: 'var(--text-muted)', fontSize: 12 }}><Loader size={14} /> Carregando...</div>
 
+  const isOnline = status?.online === true
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Krill online/offline */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{
           width: 10, height: 10, borderRadius: '50%',
-          background: status?.online ? 'var(--green)' : 'var(--red)',
+          background: isOnline ? 'var(--green)' : 'var(--red)',
         }} />
         <span style={{ fontWeight: 600, fontSize: 13 }}>
-          Krill {status?.online ? 'Online' : 'Offline'}
+          Krill {isOnline ? 'Online' : 'Offline'}
         </span>
-        {status?.info?.version && (
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>v{status.info.version}</span>
-        )}
         <button onClick={onRefresh} style={{ ...btn('ghost'), marginLeft: 'auto', padding: '4px 10px' }}>
           <RefreshCw size={12} /> Atualizar
         </button>
       </div>
 
-      {!status?.online && (
+      {!isOnline && (
         <div style={{
           padding: '10px 14px', borderRadius: 'var(--r-sm)',
           background: 'rgba(239,68,68,.1)', border: '1px solid var(--red)',
@@ -139,12 +178,12 @@ function StatusSection({ status, loading, onRefresh }) {
         }}>
           <AlertCircle size={13} style={{ marginRight: 6 }} />
           Krill inacessível. Verifique se o container está rodando.
-          {status?.error && <div style={{ marginTop: 4, opacity: 0.8 }}>{status.error}</div>}
+          {status?.error && <div style={{ marginTop: 4, opacity: 0.8 }}>{String(status.error)}</div>}
         </div>
       )}
 
       {/* Lista de CAs */}
-      {status?.cas?.length > 0 && (
+      {Array.isArray(status?.cas) && status.cas.length > 0 && (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)' }}>
@@ -154,26 +193,31 @@ function StatusSection({ status, loading, onRefresh }) {
             </tr>
           </thead>
           <tbody>
-            {status.cas.map(ca => (
-              <tr key={ca.handle} style={{ borderBottom: '1px solid var(--border-dim)' }}>
-                <td style={{ padding: '8px 10px', fontWeight: 600, fontFamily: 'monospace' }}>{ca.handle}</td>
-                <td style={{ padding: '8px 10px' }}>
-                  {ca.parent
-                    ? <span style={{ color: 'var(--green)' }}><CheckCircle size={12} style={{ marginRight: 4 }} />{ca.parent}</span>
-                    : <span style={{ color: 'var(--text-muted)' }}>Não configurado</span>}
-                </td>
-                <td style={{ padding: '8px 10px' }}>
-                  {ca.has_repo
-                    ? <span style={{ color: 'var(--green)' }}><CheckCircle size={12} style={{ marginRight: 4 }} />Configurado</span>
-                    : <span style={{ color: 'var(--text-muted)' }}>Não configurado</span>}
-                </td>
-              </tr>
-            ))}
+            {status.cas.map(ca => {
+              const handle  = String(ca.handle  ?? '')
+              const parent  = ca.parent  ? String(ca.parent)  : null
+              const hasRepo = ca.has_repo === true
+              return (
+                <tr key={handle} style={{ borderBottom: '1px solid var(--border-dim)' }}>
+                  <td style={{ padding: '8px 10px', fontWeight: 600, fontFamily: 'monospace' }}>{handle}</td>
+                  <td style={{ padding: '8px 10px' }}>
+                    {parent
+                      ? <span style={{ color: 'var(--green)' }}><CheckCircle size={12} style={{ marginRight: 4 }} />{parent}</span>
+                      : <span style={{ color: 'var(--text-muted)' }}>Não configurado</span>}
+                  </td>
+                  <td style={{ padding: '8px 10px' }}>
+                    {hasRepo
+                      ? <span style={{ color: 'var(--green)' }}><CheckCircle size={12} style={{ marginRight: 4 }} />Configurado</span>
+                      : <span style={{ color: 'var(--text-muted)' }}>Não configurado</span>}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       )}
 
-      {status?.online && status?.cas?.length === 0 && (
+      {isOnline && (!status?.cas || status.cas.length === 0) && (
         <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>
           Nenhuma CA criada ainda. Use a seção "Configuração" abaixo.
         </div>
@@ -183,45 +227,55 @@ function StatusSection({ status, loading, onRefresh }) {
 }
 
 // ── Seção: Configuração RFC 8183 ──────────────────────────────────────────────
+// NOTE: We derive hasParent/hasRepo from the `cas` prop (primitives only).
+// We do NOT call api.krillGetCa() to avoid passing raw Krill CA objects to state.
 
 function ConfigSection({ cas, onCaCreated }) {
-  const [handle, setHandle]           = useState('')
-  const [selectedCa, setSelectedCa]   = useState('')
-  const [caDetail, setCaDetail]       = useState(null)
-  const [childXml, setChildXml]       = useState('')
-  const [repoXml, setRepoXml]         = useState('')
+  const [handle, setHandle]             = useState('')
+  const [selectedCa, setSelectedCa]     = useState('')
+  const [childXml, setChildXml]         = useState('')
+  const [repoXml, setRepoXml]           = useState('')
   const [parentHandle, setParentHandle] = useState('registro-br')
-  const [parentXml, setParentXml]     = useState('')
+  const [parentXml, setParentXml]       = useState('')
   const [repoResponseXml, setRepoResponseXml] = useState('')
-  const [loadingXml, setLoadingXml]   = useState(false)
-  const [status, setStatus]           = useState(null)
-  const [busy, setBusy]               = useState(false)
+  const [loadingXml, setLoadingXml]     = useState(false)
+  const [statusMsg, setStatusMsg]       = useState(null)
+  const [busy, setBusy]                 = useState(false)
 
+  // Set first CA when list loads
   useEffect(() => {
-    if (cas.length > 0 && !selectedCa) setSelectedCa(cas[0].handle)
+    if (cas.length > 0 && !selectedCa) setSelectedCa(String(cas[0].handle))
   }, [cas])
 
+  // Load XMLs when selected CA changes
   useEffect(() => {
-    if (selectedCa) loadCaDetail()
+    if (selectedCa) loadXmls(selectedCa)
   }, [selectedCa])
 
-  async function loadCaDetail() {
+  // Derive hasParent and hasRepo from the cas prop (no raw CA objects needed)
+  const caInfo   = cas.find(c => String(c.handle) === selectedCa) || null
+  const hasParent = caInfo?.parent ? true : false
+  const hasRepo   = caInfo?.has_repo === true
+
+  async function loadXmls(ca) {
     setLoadingXml(true)
     try {
-      const detail = await api.krillGetCa(selectedCa)
-      setCaDetail(detail)
-      // Carrega child request
-      const cr = await api.krillChildRequest(selectedCa)
-      setChildXml(cr.xml || '')
-      // Carrega repo request se parent já configurado
-      if (detail.parents && Object.keys(detail.parents).length > 0) {
+      const cr = await api.krillChildRequest(ca)
+      setChildXml(String(cr.xml || ''))
+      // Load repo request XML only if parent is already configured
+      const info = cas.find(c => String(c.handle) === ca)
+      if (info?.parent) {
         try {
-          const rr = await api.krillRepoRequest(selectedCa)
-          setRepoXml(rr.xml || '')
-        } catch {}
+          const rr = await api.krillRepoRequest(ca)
+          setRepoXml(String(rr.xml || ''))
+        } catch {
+          setRepoXml('')
+        }
+      } else {
+        setRepoXml('')
       }
     } catch (e) {
-      console.error(e)
+      console.error('loadXmls error:', e)
     } finally {
       setLoadingXml(false)
     }
@@ -229,45 +283,44 @@ function ConfigSection({ cas, onCaCreated }) {
 
   async function createCa() {
     if (!handle.trim()) return
-    setBusy(true); setStatus(null)
+    setBusy(true); setStatusMsg(null)
     try {
       await api.krillCreateCa(handle.trim())
-      setStatus({ ok: true, msg: `CA "${handle}" criada com sucesso.` })
+      setStatusMsg({ ok: true, msg: `CA "${handle}" criada com sucesso.` })
       setHandle('')
       onCaCreated()
     } catch (e) {
-      setStatus({ ok: false, msg: e.message })
+      setStatusMsg({ ok: false, msg: String(e.message) })
     } finally { setBusy(false) }
   }
 
   async function submitParent() {
     if (!parentXml.trim()) return
-    setBusy(true); setStatus(null)
+    setBusy(true); setStatusMsg(null)
     try {
       await api.krillAddParent(selectedCa, parentHandle, parentXml.trim())
-      setStatus({ ok: true, msg: 'Parent configurado! Agora configure o repositório abaixo.' })
+      setStatusMsg({ ok: true, msg: 'Parent configurado! Agora configure o repositório abaixo.' })
       setParentXml('')
-      await loadCaDetail()
+      onCaCreated()          // refresh parent status via main loadStatus
+      await loadXmls(selectedCa)
     } catch (e) {
-      setStatus({ ok: false, msg: e.message })
+      setStatusMsg({ ok: false, msg: String(e.message) })
     } finally { setBusy(false) }
   }
 
   async function submitRepo() {
     if (!repoResponseXml.trim()) return
-    setBusy(true); setStatus(null)
+    setBusy(true); setStatusMsg(null)
     try {
       await api.krillConfigureRepo(selectedCa, repoResponseXml.trim())
-      setStatus({ ok: true, msg: 'Repositório configurado! O Krill está pronto para emitir ROAs.' })
+      setStatusMsg({ ok: true, msg: 'Repositório configurado! O Krill está pronto para emitir ROAs.' })
       setRepoResponseXml('')
-      await loadCaDetail()
+      onCaCreated()
+      await loadXmls(selectedCa)
     } catch (e) {
-      setStatus({ ok: false, msg: e.message })
+      setStatusMsg({ ok: false, msg: String(e.message) })
     } finally { setBusy(false) }
   }
-
-  const hasParent = caDetail?.parents && Object.keys(caDetail.parents).length > 0
-  const hasRepo   = !!caDetail?.repo_info
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -281,7 +334,7 @@ function ConfigSection({ cas, onCaCreated }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
             <span style={{ color: 'var(--text-muted)' }}>CA ativa:</span>
             <select value={selectedCa} onChange={e => setSelectedCa(e.target.value)} style={{ ...input, width: 'auto' }}>
-              {cas.map(c => <option key={c.handle} value={c.handle}>{c.handle}</option>)}
+              {cas.map(c => <option key={String(c.handle)} value={String(c.handle)}>{String(c.handle)}</option>)}
             </select>
           </div>
         ) : (
@@ -316,7 +369,7 @@ function ConfigSection({ cas, onCaCreated }) {
               {hasParent && <span style={{ marginLeft: 8 }}><CheckCircle size={12} /></span>}
             </h3>
             {hasParent ? (
-              <div style={{ fontSize: 12, color: 'var(--green)' }}>Parent já configurado.</div>
+              <div style={{ fontSize: 12, color: 'var(--green)' }}>Parent já configurado ({caInfo.parent}).</div>
             ) : (
               <>
                 <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
@@ -388,7 +441,7 @@ function ConfigSection({ cas, onCaCreated }) {
         </>
       )}
 
-      {status && <StatusBadge ok={status.ok} msg={status.msg} />}
+      {statusMsg && <StatusBadge ok={statusMsg.ok} msg={statusMsg.msg} />}
     </div>
   )
 }
@@ -396,22 +449,23 @@ function ConfigSection({ cas, onCaCreated }) {
 // ── Seção: ROAs ───────────────────────────────────────────────────────────────
 
 function ROASection({ ca }) {
-  const [roas, setRoas]     = useState([])
+  const [roas, setRoas]       = useState([])
   const [loading, setLoading] = useState(false)
-  const [asn, setAsn]       = useState('')
-  const [prefix, setPrefix] = useState('')
-  const [maxLen, setMaxLen] = useState('')
-  const [status, setStatus] = useState(null)
-  const [busy, setBusy]     = useState(false)
+  const [asn, setAsn]         = useState('')
+  const [prefix, setPrefix]   = useState('')
+  const [maxLen, setMaxLen]   = useState('')
+  const [statusMsg, setStatusMsg] = useState(null)
+  const [busy, setBusy]       = useState(false)
 
   const load = useCallback(async () => {
     if (!ca) return
     setLoading(true)
     try {
       const r = await api.krillRoas(ca)
-      setRoas(Array.isArray(r) ? r : (r.roas ?? r.authorized ?? []))
+      const list = Array.isArray(r) ? r : (Array.isArray(r?.roas) ? r.roas : (Array.isArray(r?.authorized) ? r.authorized : []))
+      setRoas(list)
     } catch (e) {
-      setStatus({ ok: false, msg: e.message })
+      setStatusMsg({ ok: false, msg: String(e.message) })
     } finally { setLoading(false) }
   }, [ca])
 
@@ -419,7 +473,7 @@ function ROASection({ ca }) {
 
   async function addRoa() {
     if (!asn || !prefix) return
-    setBusy(true); setStatus(null)
+    setBusy(true); setStatusMsg(null)
     try {
       const prefLen = parseInt(prefix.split('/')[1] || '0')
       await api.krillAddRoa(ca, {
@@ -427,26 +481,26 @@ function ROASection({ ca }) {
         prefix,
         max_length: maxLen ? parseInt(maxLen) : prefLen,
       })
-      setStatus({ ok: true, msg: 'ROA adicionado.' })
+      setStatusMsg({ ok: true, msg: 'ROA adicionado.' })
       setAsn(''); setPrefix(''); setMaxLen('')
       load()
     } catch (e) {
-      setStatus({ ok: false, msg: e.message })
+      setStatusMsg({ ok: false, msg: String(e.message) })
     } finally { setBusy(false) }
   }
 
   async function removeRoa(roa) {
-    setBusy(true); setStatus(null)
+    setBusy(true); setStatusMsg(null)
     try {
       await api.krillRemoveRoa(ca, {
         asn: roa.asn,
         prefix: roa.prefix,
         max_length: roa.max_length,
       })
-      setStatus({ ok: true, msg: 'ROA removido.' })
+      setStatusMsg({ ok: true, msg: 'ROA removido.' })
       load()
     } catch (e) {
-      setStatus({ ok: false, msg: e.message })
+      setStatusMsg({ ok: false, msg: String(e.message) })
     } finally { setBusy(false) }
   }
 
@@ -492,9 +546,9 @@ function ROASection({ ca }) {
           <tbody>
             {roas.map((r, i) => (
               <tr key={i} style={{ borderBottom: '1px solid var(--border-dim)' }}>
-                <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontWeight: 600 }}>{r.asn}</td>
-                <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>{r.prefix}</td>
-                <td style={{ padding: '8px 10px', color: 'var(--text-muted)' }}>/{r.max_length}</td>
+                <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontWeight: 600 }}>{String(r.asn ?? '')}</td>
+                <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>{String(r.prefix ?? '')}</td>
+                <td style={{ padding: '8px 10px', color: 'var(--text-muted)' }}>/{String(r.max_length ?? '')}</td>
                 <td style={{ padding: '8px 10px' }}>
                   <button onClick={() => removeRoa(r)} disabled={busy} style={btn('danger')}>
                     <Trash2 size={11} />
@@ -506,7 +560,7 @@ function ROASection({ ca }) {
         </table>
       )}
 
-      {status && <StatusBadge ok={status.ok} msg={status.msg} />}
+      {statusMsg && <StatusBadge ok={statusMsg.ok} msg={statusMsg.msg} />}
     </div>
   )
 }
@@ -525,18 +579,18 @@ const BGP_LABEL = {
 }
 
 function BGPSection({ ca }) {
-  const [data, setData]     = useState(null)
+  const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(false)
-  const [status, setStatus] = useState(null)
+  const [statusMsg, setStatusMsg] = useState(null)
 
   const load = useCallback(async () => {
     if (!ca) return
-    setLoading(true); setStatus(null)
+    setLoading(true); setStatusMsg(null)
     try {
       const r = await api.krillBgp(ca)
       setData(r)
     } catch (e) {
-      setStatus({ ok: false, msg: e.message })
+      setStatusMsg({ ok: false, msg: String(e.message) })
     } finally { setLoading(false) }
   }, [ca])
 
@@ -544,7 +598,7 @@ function BGPSection({ ca }) {
 
   if (!ca) return <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Selecione uma CA primeiro.</div>
 
-  const announcements = data?.announcements || []
+  const announcements = Array.isArray(data?.announcements) ? data.announcements : []
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -571,11 +625,11 @@ function BGPSection({ ca }) {
           </thead>
           <tbody>
             {announcements.map((a, i) => {
-              const state = a.validity?.state || 'not_found'
+              const state = String(a?.validity?.state || 'not_found')
               return (
                 <tr key={i} style={{ borderBottom: '1px solid var(--border-dim)' }}>
-                  <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>{a.prefix}</td>
-                  <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>{a.asn}</td>
+                  <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>{String(a.prefix ?? '')}</td>
+                  <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>{String(a.asn ?? '')}</td>
                   <td style={{ padding: '8px 10px' }}>
                     <span style={{
                       color: BGP_COLOR[state] || 'var(--text-muted)',
@@ -595,7 +649,7 @@ function BGPSection({ ca }) {
         </table>
       )}
 
-      {status && <StatusBadge ok={status.ok} msg={status.msg} />}
+      {statusMsg && <StatusBadge ok={statusMsg.ok} msg={statusMsg.msg} />}
     </div>
   )
 }
@@ -612,55 +666,58 @@ export default function RPKI() {
     try {
       const r = await api.krillStatus()
       setStatus(r)
-      if (r.cas?.length > 0 && !selectedCa) setSelectedCa(r.cas[0].handle)
+      if (Array.isArray(r.cas) && r.cas.length > 0 && !selectedCa) {
+        setSelectedCa(String(r.cas[0].handle))
+      }
     } catch (e) {
-      setStatus({ online: false, error: e.message, cas: [] })
+      setStatus({ online: false, error: String(e.message), cas: [] })
     } finally { setLoading(false) }
   }, [])
 
   useEffect(() => { loadStatus() }, [loadStatus])
 
-  const cas = status?.cas || []
+  const cas = Array.isArray(status?.cas) ? status.cas : []
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ShieldCheck size={20} color="var(--accent)" /> RPKI
-          </h1>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-            Krill RPKI CA — Route Origin Authorizations
-          </p>
-        </div>
-        {cas.length > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>CA:</span>
-            <select value={selectedCa} onChange={e => setSelectedCa(e.target.value)} style={{ ...input, width: 'auto' }}>
-              {cas.map(c => <option key={c.handle} value={c.handle}>{c.handle}</option>)}
-            </select>
+    <ErrorBoundary>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+          <div>
+            <h1 style={{ fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <ShieldCheck size={20} color="var(--accent)" /> RPKI
+            </h1>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+              Krill RPKI CA — Route Origin Authorizations
+            </p>
           </div>
-        )}
+          {cas.length > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>CA:</span>
+              <select value={selectedCa} onChange={e => setSelectedCa(e.target.value)} style={{ ...input, width: 'auto' }}>
+                {cas.map(c => <option key={String(c.handle)} value={String(c.handle)}>{String(c.handle)}</option>)}
+              </select>
+            </div>
+          )}
+        </div>
+
+        <CollapsibleSection title="Status" icon={ShieldCheck} defaultOpen>
+          <StatusSection status={status} loading={loading} onRefresh={loadStatus} />
+        </CollapsibleSection>
+
+        <CollapsibleSection title="Configuração (RFC 8183)" icon={Upload}
+          badge={cas.length === 0 ? 'pendente' : null}>
+          <ConfigSection cas={cas} onCaCreated={loadStatus} />
+        </CollapsibleSection>
+
+        <CollapsibleSection title="ROAs" icon={CheckCircle}>
+          <ROASection ca={selectedCa} />
+        </CollapsibleSection>
+
+        <CollapsibleSection title="BGP Analysis" icon={RefreshCw}>
+          <BGPSection ca={selectedCa} />
+        </CollapsibleSection>
       </div>
-
-      <CollapsibleSection title="Status" icon={ShieldCheck} defaultOpen>
-        <StatusSection status={status} loading={loading} onRefresh={loadStatus} />
-      </CollapsibleSection>
-
-      <CollapsibleSection title="Configuração (RFC 8183)" icon={Upload}
-        badge={cas.length === 0 ? 'pendente' : undefined}>
-        <ConfigSection cas={cas} onCaCreated={loadStatus} />
-      </CollapsibleSection>
-
-      <CollapsibleSection title="ROAs" icon={CheckCircle}
-        badge={`${cas.length > 0 ? '' : '—'}`}>
-        <ROASection ca={selectedCa} />
-      </CollapsibleSection>
-
-      <CollapsibleSection title="BGP Analysis" icon={RefreshCw}>
-        <BGPSection ca={selectedCa} />
-      </CollapsibleSection>
-    </div>
+    </ErrorBoundary>
   )
 }
