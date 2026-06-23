@@ -1,31 +1,18 @@
 import { useState, useEffect } from 'react'
-import { Users as UsersIcon, Plus, Trash2, Loader, Search, X } from 'lucide-react'
+import { Users as UsersIcon, Plus, Trash2, Loader, Search, X, KeyRound } from 'lucide-react'
 import { api } from '../api'
 
 const ROLES = ['admin', 'operator', 'viewer']
 
-const roleBadge = {
+const roleColor = {
   admin:    { color: 'var(--red)',    bg: 'var(--red-dim)'    },
   operator: { color: 'var(--orange)', bg: 'var(--orange-dim)' },
   viewer:   { color: 'var(--green)',  bg: 'var(--green-dim)'  },
 }
 
-function RoleBadge({ role }) {
-  const s = roleBadge[role] || {}
-  return (
-    <span style={{
-      padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700,
-      color: s.color, background: s.bg || 'var(--bg-canvas)',
-      border: `1px solid ${s.color || 'var(--border)'}`,
-      textTransform: 'uppercase',
-    }}>{role}</span>
-  )
-}
-
 function parseUA(ua) {
   if (!ua) return '—'
-  let browser = 'Unknown'
-  let os = 'Unknown'
+  let browser = 'Unknown', os = 'Unknown'
   if (/OPR\/|Opera/.test(ua)) browser = 'Opera'
   else if (/Edg\//.test(ua)) browser = 'Edge'
   else if (/Chrome\//.test(ua) && !/Chromium/.test(ua)) browser = 'Chrome'
@@ -36,22 +23,22 @@ function parseUA(ua) {
   else if (/Windows NT/.test(ua)) os = 'Windows'
   else if (/Mac OS X/.test(ua)) os = 'macOS'
   else if (/Linux/.test(ua)) os = 'Linux'
-  return `${browser} on ${os}`
+  return `${browser} / ${os}`
 }
 
 function relTime(ts) {
   if (!ts) return '—'
   const diff = Date.now() - new Date(ts + 'Z').getTime()
+  if (diff < 0) return 'agora'
   const m = Math.floor(diff / 60000)
   if (m < 1) return 'agora'
   if (m < 60) return `${m} min atrás`
   const h = Math.floor(m / 60)
   if (h < 24) return `${h}h atrás`
-  const d = Math.floor(h / 24)
-  return `${d} dias atrás`
+  return `${Math.floor(h / 24)} dias atrás`
 }
 
-const inputStyle = {
+const base = {
   background: 'var(--bg-canvas)',
   border: '1px solid var(--border)',
   borderRadius: 'var(--r-sm)',
@@ -59,22 +46,50 @@ const inputStyle = {
   padding: '8px 12px',
   fontSize: 13,
   outline: 'none',
+  width: '100%',
+  boxSizing: 'border-box',
+}
+
+function Modal({ title, onClose, children }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+    }} onClick={onClose}>
+      <div style={{
+        background: 'var(--bg-panel)', border: '1px solid var(--border)',
+        borderRadius: 'var(--r-sm)', padding: 24, width: 400, maxWidth: '90vw',
+      }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700 }}>{title}</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+            <X size={18} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
 }
 
 export default function Users() {
-  const [users, setUsers]     = useState([])
-  const [me, setMe]           = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch]   = useState('')
-  const [showModal, setShowModal] = useState(false)
-  const [error, setError]     = useState('')
+  const [users, setUsers]       = useState([])
+  const [me, setMe]             = useState(null)
+  const [loading, setLoading]   = useState(true)
+  const [search, setSearch]     = useState('')
+  const [error, setError]       = useState('')
 
-  // form
-  const [newUsername, setNewUsername] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [newRole, setNewRole]         = useState('viewer')
-  const [adding, setAdding]           = useState(false)
-  const [formError, setFormError]     = useState('')
+  // Modal: criar usuário
+  const [showCreate, setShowCreate] = useState(false)
+  const [newUser, setNewUser]       = useState({ username: '', password: '', role: 'viewer' })
+  const [creating, setCreating]     = useState(false)
+  const [createErr, setCreateErr]   = useState('')
+
+  // Modal: reset senha
+  const [editUser, setEditUser]     = useState(null)  // {id, username}
+  const [newPass, setNewPass]       = useState('')
+  const [resetting, setResetting]   = useState(false)
+  const [resetErr, setResetErr]     = useState('')
 
   async function load() {
     try {
@@ -90,54 +105,47 @@ export default function Users() {
 
   useEffect(() => { load() }, [])
 
-  async function addUser(e) {
+  async function handleCreate(e) {
     e.preventDefault()
-    if (!newUsername.trim() || !newPassword.trim()) return
-    setAdding(true)
-    setFormError('')
+    setCreating(true); setCreateErr('')
     try {
-      await api.createUser({ username: newUsername.trim(), password: newPassword, role: newRole })
-      setNewUsername('')
-      setNewPassword('')
-      setNewRole('viewer')
-      setShowModal(false)
+      await api.createUser(newUser)
+      setNewUser({ username: '', password: '', role: 'viewer' })
+      setShowCreate(false)
       await load()
-    } catch (e) {
-      setFormError(e.message)
-    } finally {
-      setAdding(false)
-    }
+    } catch (e) { setCreateErr(e.message) }
+    finally { setCreating(false) }
   }
 
-  async function deleteUser(id) {
-    if (!confirm('Remover este usuário?')) return
-    try {
-      await api.deleteUser(id)
-      await load()
-    } catch (e) {
-      setError(e.message)
-    }
+  async function handleDelete(u) {
+    if (!confirm(`Remover o usuário "${u.username}"?`)) return
+    try { await api.deleteUser(u.id); await load() }
+    catch (e) { setError(e.message) }
   }
 
-  async function changeRole(id, role) {
-    try {
-      await api.changeRole(id, role)
-      await load()
-    } catch (e) {
-      setError(e.message)
-    }
+  async function handleRole(id, role) {
+    try { await api.changeRole(id, role); await load() }
+    catch (e) { setError(e.message) }
   }
 
-  const filtered = users.filter(u =>
-    u.username.toLowerCase().includes(search.toLowerCase())
-  )
+  async function handleResetPass(e) {
+    e.preventDefault()
+    setResetting(true); setResetErr('')
+    try {
+      await api.adminResetPassword(editUser.id, newPass)
+      setEditUser(null); setNewPass('')
+    } catch (e) { setResetErr(e.message) }
+    finally { setResetting(false) }
+  }
 
   const isAdmin = me?.role === 'admin'
+  const filtered = users.filter(u => u.username.toLowerCase().includes(search.toLowerCase()))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
             <UsersIcon size={20} color="var(--accent)" /> Usuários
@@ -145,7 +153,7 @@ export default function Users() {
           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Gerenciar usuários do painel</div>
         </div>
         {isAdmin && (
-          <button onClick={() => setShowModal(true)} style={{
+          <button onClick={() => { setShowCreate(true); setCreateErr('') }} style={{
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '8px 16px', background: 'var(--accent)',
             border: 'none', borderRadius: 'var(--r-sm)',
@@ -160,12 +168,12 @@ export default function Users() {
 
       {/* Search */}
       <div style={{ position: 'relative' }}>
-        <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+        <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Buscar por login..."
-          style={{ ...inputStyle, width: '100%', paddingLeft: 32, boxSizing: 'border-box' }}
+          style={{ ...base, paddingLeft: 32 }}
         />
       </div>
 
@@ -174,6 +182,7 @@ export default function Users() {
         <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text-muted)' }}>
           {filtered.length} usuário{filtered.length !== 1 ? 's' : ''}
         </div>
+
         {loading ? (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>Carregando…</div>
         ) : (
@@ -186,117 +195,173 @@ export default function Users() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(u => (
-                <tr key={u.id}
-                  style={{ borderBottom: '1px solid var(--border-dim)' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-panel-2)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                >
-                  <td style={{ padding: '10px 16px', fontWeight: 600, color: 'var(--text-primary)' }}>{u.username}</td>
-                  <td style={{ padding: '10px 16px' }}><RoleBadge role={u.role} /></td>
-                  <td style={{ padding: '10px 16px', color: 'var(--text-muted)' }}>{relTime(u.last_login_at)}</td>
-                  <td style={{ padding: '10px 16px', color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: 12 }}>
-                    {u.last_login_ip || '—'}
-                  </td>
-                  <td style={{ padding: '10px 16px', color: 'var(--text-muted)' }}>{parseUA(u.last_login_ua)}</td>
-                  <td style={{ padding: '10px 16px' }}>
-                    {isAdmin && me?.username !== u.username && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {filtered.map(u => {
+                const isSelf = me?.username === u.username
+                const canEdit = isAdmin && !isSelf
+                const rc = roleColor[u.role] || {}
+                return (
+                  <tr key={u.id}
+                    style={{ borderBottom: '1px solid var(--border-dim)' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-panel-2)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {/* Login */}
+                    <td style={{ padding: '10px 16px', fontWeight: 600 }}>{u.username}</td>
+
+                    {/* Role — select para admin em outros, badge para o resto */}
+                    <td style={{ padding: '10px 16px' }}>
+                      {canEdit ? (
                         <select
                           value={u.role}
-                          onChange={e => changeRole(u.id, e.target.value)}
+                          onChange={e => handleRole(u.id, e.target.value)}
                           style={{
-                            ...inputStyle,
-                            padding: '4px 8px',
-                            fontSize: 12,
-                            cursor: 'pointer',
+                            background: rc.bg || 'var(--bg-canvas)',
+                            border: `1px solid ${rc.color || 'var(--border)'}`,
+                            borderRadius: 4, padding: '3px 8px',
+                            color: rc.color || 'var(--text-primary)',
+                            fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                            textTransform: 'uppercase', outline: 'none',
                           }}
                         >
-                          {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                          {ROLES.map(r => <option key={r} value={r} style={{ textTransform: 'uppercase' }}>{r.toUpperCase()}</option>)}
                         </select>
-                        <button onClick={() => deleteUser(u.id)} title="Remover usuário" style={{
-                          background: 'transparent', border: '1px solid var(--red-dim)',
-                          borderRadius: 4, padding: '4px 8px',
-                          color: 'var(--red)', cursor: 'pointer',
-                          display: 'inline-flex', alignItems: 'center',
-                        }}>
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                      ) : (
+                        <span style={{
+                          padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700,
+                          color: rc.color, background: rc.bg,
+                          border: `1px solid ${rc.color || 'var(--border)'}`,
+                          textTransform: 'uppercase',
+                        }}>{u.role}</span>
+                      )}
+                    </td>
+
+                    {/* Último acesso */}
+                    <td style={{ padding: '10px 16px', color: 'var(--text-muted)' }}>{relTime(u.last_login_at)}</td>
+
+                    {/* IP */}
+                    <td style={{ padding: '10px 16px', color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: 12 }}>
+                      {u.last_login_ip || '—'}
+                    </td>
+
+                    {/* Navegador / SO */}
+                    <td style={{ padding: '10px 16px', color: 'var(--text-muted)' }}>{parseUA(u.last_login_ua)}</td>
+
+                    {/* Ações */}
+                    <td style={{ padding: '10px 16px' }}>
+                      {canEdit && (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            onClick={() => { setEditUser(u); setNewPass(''); setResetErr('') }}
+                            title="Redefinir senha"
+                            style={{
+                              background: 'transparent', border: '1px solid var(--border)',
+                              borderRadius: 4, padding: '4px 8px',
+                              color: 'var(--text-secondary)', cursor: 'pointer',
+                              display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11,
+                            }}
+                          >
+                            <KeyRound size={12} /> Senha
+                          </button>
+                          <button
+                            onClick={() => handleDelete(u)}
+                            title="Remover usuário"
+                            style={{
+                              background: 'transparent', border: '1px solid var(--red-dim)',
+                              borderRadius: 4, padding: '4px 8px',
+                              color: 'var(--red)', cursor: 'pointer',
+                              display: 'inline-flex', alignItems: 'center',
+                            }}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )}
       </div>
 
-      {/* Modal Novo Usuário */}
-      {showModal && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-        }} onClick={() => setShowModal(false)}>
-          <div style={{
-            background: 'var(--bg-panel)', border: '1px solid var(--border)',
-            borderRadius: 'var(--r-sm)', padding: 24, width: 400, maxWidth: '90vw',
-          }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700 }}>Novo usuário</h2>
-              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={18} />
+      {/* Modal: Novo usuário */}
+      {showCreate && (
+        <Modal title="Novo usuário" onClose={() => setShowCreate(false)}>
+          <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Username</label>
+              <input value={newUser.username} onChange={e => setNewUser(p => ({ ...p, username: e.target.value }))}
+                placeholder="username" required style={base} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Senha</label>
+              <input value={newUser.password} onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))}
+                type="password" placeholder="mínimo 6 caracteres" required style={base} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Role</label>
+              <select value={newUser.role} onChange={e => setNewUser(p => ({ ...p, role: e.target.value }))} style={base}>
+                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            {createErr && <div style={{ color: 'var(--red)', fontSize: 12 }}>{createErr}</div>}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+              <button type="button" onClick={() => setShowCreate(false)} style={{
+                padding: '8px 16px', background: 'transparent',
+                border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+                color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer',
+              }}>Cancelar</button>
+              <button type="submit" disabled={creating} style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px', background: 'var(--accent)',
+                border: 'none', borderRadius: 'var(--r-sm)',
+                color: '#fff', fontSize: 13, fontWeight: 600,
+                cursor: creating ? 'not-allowed' : 'pointer',
+              }}>
+                {creating ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={14} />}
+                Criar
               </button>
             </div>
-            <form onSubmit={addUser} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Username</label>
-                <input
-                  value={newUsername}
-                  onChange={e => setNewUsername(e.target.value)}
-                  placeholder="username"
-                  required
-                  style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Senha</label>
-                <input
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  type="password"
-                  placeholder="mínimo 6 caracteres"
-                  required
-                  style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Role</label>
-                <select value={newRole} onChange={e => setNewRole(e.target.value)} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}>
-                  {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
-              {formError && <div style={{ color: 'var(--red)', fontSize: 12 }}>{formError}</div>}
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-                <button type="button" onClick={() => setShowModal(false)} style={{
-                  padding: '8px 16px', background: 'transparent',
-                  border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-                  color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer',
-                }}>Cancelar</button>
-                <button type="submit" disabled={adding} style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '8px 16px', background: 'var(--accent)',
-                  border: 'none', borderRadius: 'var(--r-sm)',
-                  color: '#fff', fontSize: 13, fontWeight: 600,
-                  cursor: adding ? 'not-allowed' : 'pointer',
-                }}>
-                  {adding ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={14} />}
-                  Criar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Modal: Redefinir senha */}
+      {editUser && (
+        <Modal title={`Redefinir senha — ${editUser.username}`} onClose={() => setEditUser(null)}>
+          <form onSubmit={handleResetPass} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Nova senha</label>
+              <input
+                value={newPass}
+                onChange={e => setNewPass(e.target.value)}
+                type="password"
+                placeholder="mínimo 6 caracteres"
+                required
+                style={base}
+              />
+            </div>
+            {resetErr && <div style={{ color: 'var(--red)', fontSize: 12 }}>{resetErr}</div>}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+              <button type="button" onClick={() => setEditUser(null)} style={{
+                padding: '8px 16px', background: 'transparent',
+                border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+                color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer',
+              }}>Cancelar</button>
+              <button type="submit" disabled={resetting} style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px', background: 'var(--accent)',
+                border: 'none', borderRadius: 'var(--r-sm)',
+                color: '#fff', fontSize: 13, fontWeight: 600,
+                cursor: resetting ? 'not-allowed' : 'pointer',
+              }}>
+                {resetting ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <KeyRound size={14} />}
+                Salvar
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

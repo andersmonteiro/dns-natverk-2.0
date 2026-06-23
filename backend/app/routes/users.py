@@ -27,7 +27,7 @@ async def list_users(user=Depends(get_current_user)):
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute(
-            "SELECT id, username, role, created_at FROM users ORDER BY id"
+            "SELECT id, username, role, created_at, last_login_at, last_login_ip, last_login_ua FROM users ORDER BY id"
         )
         rows = await cursor.fetchall()
     return [dict(r) for r in rows]
@@ -81,6 +81,28 @@ async def change_role(user_id: int, data: RoleChange, user=Depends(require_admin
         await db.execute(
             "INSERT INTO audit_log (username, action, detail) VALUES (?, ?, ?)",
             (user["username"], "user_role_change", f"id={user_id} role={data.role}")
+        )
+        await db.commit()
+    return {"ok": True}
+
+
+class AdminPasswordReset(BaseModel):
+    new_password: str
+
+@router.put("/{user_id}/password")
+async def admin_reset_password(user_id: int, data: AdminPasswordReset, user=Depends(require_admin)):
+    if len(data.new_password) < 6:
+        raise HTTPException(400, "Senha deve ter ao menos 6 caracteres")
+    hashed = hash_password(data.new_password)
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute("SELECT username FROM users WHERE id = ?", (user_id,))
+        target = await cursor.fetchone()
+        if not target:
+            raise HTTPException(404, "Usuário não encontrado")
+        await db.execute("UPDATE users SET password = ? WHERE id = ?", (hashed, user_id))
+        await db.execute(
+            "INSERT INTO audit_log (username, action, detail) VALUES (?, ?, ?)",
+            (user["username"], "admin_password_reset", target[0])
         )
         await db.commit()
     return {"ok": True}

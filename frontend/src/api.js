@@ -94,6 +94,8 @@ export const api = {
   changeRole:     (id, role) => request(`/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
   changePassword: (current_password, new_password) =>
     request('/users/me/password', { method: 'POST', body: JSON.stringify({ current_password, new_password }) }),
+  adminResetPassword: (id, new_password) =>
+    request(`/users/${id}/password`, { method: 'PUT', body: JSON.stringify({ new_password }) }),
 
   // Ferramentas
   nslookup:   (data) => request('/tools/nslookup',   { method: 'POST', body: JSON.stringify(data) }),
