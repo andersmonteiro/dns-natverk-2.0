@@ -153,9 +153,18 @@ async def add_parent(ca: str, data: AddParent, user=Depends(require_admin)):
 
 @router.get("/cas/{ca}/repo-request")
 async def repo_request(ca: str, user=Depends(get_current_user)):
-    """Retorna o XML de Publisher Request para enviar ao registro.br."""
-    xml = await _get_xml(f"/cas/{ca}/repo/request.xml")
-    return {"xml": xml}
+    """Retorna o XML de Publisher Request para enviar ao registro.br.
+    Tenta /repo/request.xml primeiro; fallback para /id/publisher_request.xml
+    (disponível mesmo após o repositório já estar configurado).
+    """
+    for path in (f"/cas/{ca}/repo/request.xml", f"/cas/{ca}/id/publisher_request.xml"):
+        try:
+            xml = await _get_xml(path)
+            if xml and xml.strip():
+                return {"xml": xml}
+        except Exception:
+            continue
+    return {"xml": ""}
 
 
 class ConfigureRepo(BaseModel):

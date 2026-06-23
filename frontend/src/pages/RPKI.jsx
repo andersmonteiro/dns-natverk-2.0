@@ -333,16 +333,12 @@ function ConfigSection({ cas, onCaCreated }) {
     try {
       const cr = await api.krillChildRequest(ca)
       setChildXml(String(cr.xml || ''))
-      // Load repo request XML only if parent is already configured
-      const info = cas.find(c => String(c.handle) === ca)
-      if (info?.parent) {
-        try {
-          const rr = await api.krillRepoRequest(ca)
-          setRepoXml(String(rr.xml || ''))
-        } catch {
-          setRepoXml('')
-        }
-      } else {
+      // Sempre tenta carregar o Publisher Request XML — o Krill gera do certificado de identidade
+      // e deve retornar o mesmo XML independente de o repo já estar configurado
+      try {
+        const rr = await api.krillRepoRequest(ca)
+        setRepoXml(String(rr.xml || ''))
+      } catch {
         setRepoXml('')
       }
     } catch (e) {
