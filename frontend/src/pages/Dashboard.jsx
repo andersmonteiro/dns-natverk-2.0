@@ -34,13 +34,9 @@ function fmtUptime(secs) {
 
 const PIE_COLORS = ['#3b82f6','#22c55e','#eab308','#ef4444','#a855f7','#06b6d4','#f97316']
 
-const ttStyle = {
-  background: 'var(--bg-tooltip, #1e2433)',
-  border: '1px solid var(--border)',
-  borderRadius: 6, padding: '8px 12px', fontSize: 12,
-  color: 'var(--text-primary)',
-  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-}
+const ttStyle     = { background: '#1e2433', border: '1px solid #334155', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: '#f1f5f9', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }
+const ttItem      = { color: '#f1f5f9' }
+const ttLabel     = { color: '#94a3b8', marginBottom: 4 }
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
@@ -220,6 +216,8 @@ export default function Dashboard() {
                   <Tooltip
                     formatter={(v) => [fmt(v), 'queries']}
                     contentStyle={ttStyle}
+                    itemStyle={ttItem}
+                    labelStyle={ttLabel}
                   />
                 </PieChart>
               </ResponsiveContainer>

@@ -52,12 +52,9 @@ function sortTypes(types) {
   })
 }
 
-const tooltipStyle = {
-  background: 'var(--bg-tooltip, #1e2433)', border: '1px solid var(--border)',
-  borderRadius: 6, fontSize: 12,
-  color: 'var(--text-primary)',
-  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-}
+const tooltipStyle   = { background: '#1e2433', border: '1px solid #334155', borderRadius: 6, fontSize: 12, color: '#f1f5f9', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }
+const tooltipItem    = { color: '#f1f5f9' }
+const tooltipLabel   = { color: '#94a3b8', marginBottom: 4 }
 
 // ── componente principal ───────────────────────────────────────────────────────
 
@@ -145,6 +142,8 @@ export default function Metrics() {
                   labelFormatter={ts => fmtTs(ts, range)}
                   formatter={(v, name) => [fmt(v), name]}
                   contentStyle={tooltipStyle}
+                  itemStyle={tooltipItem}
+                  labelStyle={tooltipLabel}
                 />
                 <Legend wrapperStyle={{ fontSize: 12, paddingTop: 4 }} />
                 {tsTypes.map((t, i) => (
@@ -177,7 +176,9 @@ export default function Metrics() {
                   <Tooltip
                     formatter={(v) => [fmt(v), 'Queries']}
                     contentStyle={tooltipStyle}
-                    cursor={{ fill: 'var(--bg-hover)' }}
+                    itemStyle={tooltipItem}
+                    labelStyle={tooltipLabel}
+                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                   />
                   <Bar dataKey="count" radius={[3, 3, 0, 0]}>
                     {hourData.map((entry, i) => (
@@ -208,7 +209,7 @@ export default function Metrics() {
                         <Cell key={entry.type} fill={typeColor(entry.type, i)} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(v, name) => [fmt(v), name]} contentStyle={tooltipStyle} />
+                    <Tooltip formatter={(v, name) => [fmt(v), name]} contentStyle={tooltipStyle} itemStyle={tooltipItem} labelStyle={tooltipLabel} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 6 }}>
@@ -245,7 +246,9 @@ export default function Metrics() {
                 <Tooltip
                   formatter={(v, name) => [fmt(v), name]}
                   contentStyle={tooltipStyle}
-                  cursor={{ fill: 'var(--bg-hover)' }}
+                  itemStyle={tooltipItem}
+                  labelStyle={tooltipLabel}
+                  cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                 />
                 <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
                 {clientTypes.map((t, i) => (
