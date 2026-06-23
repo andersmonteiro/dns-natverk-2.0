@@ -167,6 +167,88 @@ async def repo_request(ca: str, user=Depends(get_current_user)):
     return {"xml": ""}
 
 
+@router.get("/cas/{ca}/details")
+async def ca_details(ca: str, user=Depends(get_current_user)):
+    """Detalhes da CA (parents, recursos, repo) como primitivos — sem objetos aninhados."""
+    try:
+        detail = await _get(f"/cas/{ca}")
+
+        # ── parents ──────────────────────────────────────────────────────────
+        raw_parents = detail.get("parents") or {}
+        parents = []
+        if isinstance(raw_parents, dict):
+            for handle, info in raw_parents.items():
+                p: dict = {"handle": str(handle), "contact": ""}
+                if isinstance(info, dict):
+                    contact = (info.get("contact") or info.get("service_uri")
+                               or info.get("uri") or "")
+                    if isinstance(contact, dict):
+                        contact = contact.get("uri") or contact.get("url") or ""
+                    p["contact"] = str(contact) if contact else ""
+                elif isinstance(info, str):
+                    p["contact"] = info
+                parents.append(p)
+
+        # Try /parents endpoint for last_exchange
+        try:
+            pd = await _get(f"/cas/{ca}/parents")
+            if isinstance(pd, dict):
+                for p in parents:
+                    entry = pd.get(p["handle"]) or {}
+                    if isinstance(entry, dict):
+                        lex = entry.get("last_exchange") or entry.get("last_response")
+                        if isinstance(lex, dict):
+                            p["last_exchange"] = str(lex.get("timestamp") or lex.get("at") or "")
+                            p["last_result"]   = str(lex.get("result", ""))
+                        elif isinstance(lex, str):
+                            p["last_exchange"] = lex
+        except Exception:
+            pass
+
+        # ── resources ────────────────────────────────────────────────────────
+        raw_res = detail.get("resources") or {}
+        resources: dict = {"asn": "", "ipv4": [], "ipv6": []}
+        if isinstance(raw_res, dict):
+            asn  = raw_res.get("asn",  raw_res.get("AS",  ""))
+            ipv4 = raw_res.get("ipv4", raw_res.get("v4",  []))
+            ipv6 = raw_res.get("ipv6", raw_res.get("v6",  []))
+            resources["asn"]  = str(asn) if asn else ""
+            resources["ipv4"] = [str(x) for x in (ipv4 if isinstance(ipv4, list) else [ipv4]) if x]
+            resources["ipv6"] = [str(x) for x in (ipv6 if isinstance(ipv6, list) else [ipv6]) if x]
+
+        # ── repo ─────────────────────────────────────────────────────────────
+        repo: dict = {}
+        raw_repo = detail.get("repo_info") or {}
+        if isinstance(raw_repo, dict):
+            for k, v in raw_repo.items():
+                if isinstance(v, (str, int)) and v:
+                    repo[str(k)] = str(v)
+        # Enrich with /repo endpoint (contact URI + last_exchange)
+        try:
+            rd = await _get(f"/cas/{ca}/repo")
+            if isinstance(rd, dict):
+                contact = rd.get("contact") or rd
+                if isinstance(contact, dict):
+                    for k, v in contact.items():
+                        if isinstance(v, (str, int)) and v and str(k) not in repo:
+                            repo[str(k)] = str(v)
+                lex = rd.get("last_exchange")
+                if isinstance(lex, dict):
+                    repo["last_exchange"] = str(lex.get("timestamp") or lex.get("at") or "")
+                    repo["last_result"]   = str(lex.get("result", ""))
+        except Exception:
+            pass
+
+        return {
+            "handle":    str(detail.get("handle", ca)),
+            "parents":   parents,
+            "resources": resources,
+            "repo":      repo,
+        }
+    except Exception as e:
+        return {"handle": ca, "parents": [], "resources": {}, "repo": {}, "error": str(e)}
+
+
 class ConfigureRepo(BaseModel):
     response_xml: str  # conteúdo do Repository Response XML
 

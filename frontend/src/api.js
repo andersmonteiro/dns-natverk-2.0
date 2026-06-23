@@ -145,6 +145,7 @@ export const api = {
   krillRepoRequest:   (ca) => request(`/krill/cas/${ca}/repo-request`),
   krillConfigureRepo: (ca, response_xml) => request(`/krill/cas/${ca}/repo`, { method: 'POST', body: JSON.stringify({ response_xml }) }),
   krillRepoContact:   (ca) => request(`/krill/cas/${ca}/repo-contact`),
+  krillCaDetails:     (ca) => request(`/krill/cas/${ca}/details`),
   krillRoas:          (ca) => request(`/krill/cas/${ca}/roas`),
   krillAddRoa:        (ca, roa) => request(`/krill/cas/${ca}/roas`, { method: 'POST', body: JSON.stringify(roa) }),
   krillRemoveRoa:     (ca, roa) => request(`/krill/cas/${ca}/roas`, { method: 'DELETE', body: JSON.stringify(roa) }),

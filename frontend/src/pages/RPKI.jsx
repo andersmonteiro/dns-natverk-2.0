@@ -137,53 +137,141 @@ function FileUploadButton({ onLoad, label = 'Carregar arquivo .xml' }) {
   )
 }
 
-// repo_data comes from status.cas[x].repo_data — flat string dict, no API call needed
-function RepoContactDisplay({ repoData }) {
-  if (!repoData || typeof repoData !== 'object') return null
+// ── Painel de detalhes dinâmicos da CA (Parents + Repo) ──────────────────────
 
-  // Friendly labels for known Krill field names
-  const LABELS = {
-    base_uri:                'SIA Base (rsync)',
-    rpki_notify:             'RRDP Notification URI',
-    sia_base:                'SIA Base (rsync)',
-    rrdp_notification_uri:   'RRDP Notification URI',
-    service_uri:             'Service URI',
-    publisher_handle:        'Publisher Handle',
-  }
+const REPO_LABELS = {
+  base_uri:              'SIA Base (rsync)',
+  rpki_notify:           'RRDP Notification URI',
+  sia_base:              'SIA Base (rsync)',
+  rrdp_notification_uri: 'RRDP Notification URI',
+  service_uri:           'Service URI',
+  publisher_handle:      'Publisher Handle',
+}
 
-  const rows = Object.entries(repoData)
-    .filter(([, v]) => v)
-    .map(([k, v]) => [LABELS[k] || k, String(v)])
-
-  if (!rows.length) return null
-
+function InfoRow({ label, value }) {
+  if (!value) return null
   return (
-    <div style={{
-      marginTop: 10, padding: '12px 14px',
-      background: 'var(--bg-panel)', border: '1px solid var(--border)',
-      borderRadius: 'var(--r-sm)', fontSize: 12,
-    }}>
-      <div style={{ fontWeight: 700, color: 'var(--text-muted)', fontSize: 11, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
-        Dados do Repositório
-      </div>
-      <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-        <tbody>
-          {rows.map(([label, value]) => (
-            <tr key={label}>
-              <td style={{ padding: '3px 10px 3px 0', color: 'var(--text-muted)', whiteSpace: 'nowrap', verticalAlign: 'top' }}>{label}</td>
-              <td style={{ padding: '3px 0', fontFamily: 'monospace', wordBreak: 'break-all', color: 'var(--text-primary)' }}>
-                {value}
-                <button onClick={() => navigator.clipboard.writeText(value)}
-                  style={{ ...btn('ghost'), padding: '1px 6px', marginLeft: 6, fontSize: 10 }}>
-                  <Copy size={10} />
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <tr>
+      <td style={{ padding: '5px 14px 5px 0', color: 'var(--text-muted)', whiteSpace: 'nowrap', verticalAlign: 'top', fontSize: 12 }}>{label}</td>
+      <td style={{ padding: '5px 0', fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all', color: 'var(--text-primary)' }}>
+        {value}
+        <button onClick={() => navigator.clipboard.writeText(value)}
+          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0 4px', opacity: 0.5, verticalAlign: 'middle' }}>
+          <Copy size={10} color="var(--text-muted)" />
+        </button>
+      </td>
+    </tr>
+  )
+}
+
+function LastExchange({ ts, result }) {
+  if (!ts) return null
+  const ok = !result || result.toLowerCase().includes('ok') || result.toLowerCase().includes('success')
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginTop: 6 }}>
+      {ok
+        ? <CheckCircle size={13} color="var(--green)" />
+        : <XCircle size={13} color="var(--red)" />}
+      <span style={{ color: 'var(--text-secondary)' }}>Último contato: {ts}</span>
+      {result && !ok && <span style={{ color: 'var(--red)', fontSize: 11 }}>({result})</span>}
     </div>
   )
+}
+
+function CaDetailsPanel({ ca, section }) {
+  const [data, setData]     = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  const load = useCallback(async () => {
+    if (!ca) return
+    setLoading(true)
+    try {
+      const r = await api.krillCaDetails(ca)
+      setData(r)
+    } catch { setData(null) }
+    finally { setLoading(false) }
+  }, [ca])
+
+  useEffect(() => { load() }, [load])
+
+  if (loading) return <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8 }}><Loader size={13} /> Carregando...</div>
+  if (!data) return null
+
+  if (section === 'parents') {
+    const parents = data.parents || []
+    const res     = data.resources || {}
+    return (
+      <div style={{ marginTop: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+          <button onClick={load} style={{ ...btn('ghost'), padding: '4px 10px' }}>
+            <RefreshCw size={12} /> Atualizar
+          </button>
+        </div>
+        {parents.map(p => (
+          <div key={p.handle} style={{
+            padding: '12px 14px', background: 'var(--bg-panel)',
+            border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', marginBottom: 8,
+          }}>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{p.handle}</div>
+            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+              <tbody>
+                <InfoRow label="Contact URI" value={p.contact} />
+              </tbody>
+            </table>
+            <LastExchange ts={p.last_exchange} result={p.last_result} />
+          </div>
+        ))}
+        {(res.asn || res.ipv4?.length || res.ipv6?.length) && (
+          <div style={{
+            padding: '10px 14px', background: 'var(--bg-panel)',
+            border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+          }}>
+            <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Recursos delegados</div>
+            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+              <tbody>
+                {res.asn  && <InfoRow label="ASN"  value={res.asn} />}
+                {res.ipv4?.length > 0 && <InfoRow label="IPv4" value={res.ipv4.join(', ')} />}
+                {res.ipv6?.length > 0 && <InfoRow label="IPv6" value={res.ipv6.join(', ')} />}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (section === 'repo') {
+    const repo = data.repo || {}
+    const rows = Object.entries(repo)
+      .filter(([k, v]) => v && k !== 'last_exchange' && k !== 'last_result')
+      .map(([k, v]) => [REPO_LABELS[k] || k, String(v)])
+    return (
+      <div style={{ marginTop: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+          <button onClick={load} style={{ ...btn('ghost'), padding: '4px 10px' }}>
+            <RefreshCw size={12} /> Atualizar
+          </button>
+        </div>
+        <div style={{
+          padding: '12px 14px', background: 'var(--bg-panel)',
+          border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+        }}>
+          {rows.length > 0 ? (
+            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+              <tbody>
+                {rows.map(([label, value]) => <InfoRow key={label} label={label} value={value} />)}
+              </tbody>
+            </table>
+          ) : (
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Dados do repositório não disponíveis.</span>
+          )}
+          <LastExchange ts={repo.last_exchange} result={repo.last_result} />
+        </div>
+      </div>
+    )
+  }
+
+  return null
 }
 
 // ── CollapsibleSection ────────────────────────────────────────────────────────
@@ -436,7 +524,7 @@ function ConfigSection({ cas, onCaCreated }) {
               {hasParent && <span style={{ marginLeft: 8 }}><CheckCircle size={12} /></span>}
             </h3>
             {hasParent ? (
-              <div style={{ fontSize: 12, color: 'var(--green)' }}>Parent já configurado ({caInfo.parent}).</div>
+              <CaDetailsPanel ca={selectedCa} section="parents" />
             ) : (
               <>
                 <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
@@ -497,11 +585,11 @@ function ConfigSection({ cas, onCaCreated }) {
               </h3>
               {hasRepo ? (
                 <div>
-                  <div style={{ fontSize: 12, color: 'var(--green)', marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, color: 'var(--green)' }}>
                     <CheckCircle size={13} style={{ marginRight: 6 }} />
                     Repositório configurado. Krill pronto para emitir ROAs.
                   </div>
-                  <RepoContactDisplay repoData={caInfo?.repo_data} />
+                  <CaDetailsPanel ca={selectedCa} section="repo" />
                 </div>
               ) : (
                 <>
