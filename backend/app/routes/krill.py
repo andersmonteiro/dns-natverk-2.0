@@ -296,10 +296,14 @@ class ROA(BaseModel):
     prefix: str      # ex: "177.130.48.0/22"
     max_length: Optional[int] = None
 
+def _asn_int(asn: str) -> int:
+    """Converte 'AS52747' ou '52747' para inteiro (Krill v0.16 exige u32)."""
+    return int(str(asn).upper().replace("AS", "").strip())
+
 @router.post("/cas/{ca}/roas")
 async def add_roa(ca: str, roa: ROA, user=Depends(require_admin)):
     max_len = roa.max_length or int(roa.prefix.split("/")[1])
-    entry = {"asn": roa.asn, "prefix": roa.prefix, "max_length": max_len}
+    entry = {"asn": _asn_int(roa.asn), "prefix": roa.prefix, "max_length": max_len}
     return await _post(f"/cas/{ca}/routes", {"added": [entry], "removed": []})
 
 
@@ -310,7 +314,7 @@ class RemoveROA(BaseModel):
 
 @router.delete("/cas/{ca}/roas")
 async def remove_roa(ca: str, roa: RemoveROA, user=Depends(require_admin)):
-    entry = {"asn": roa.asn, "prefix": roa.prefix, "max_length": roa.max_length}
+    entry = {"asn": _asn_int(roa.asn), "prefix": roa.prefix, "max_length": roa.max_length}
     return await _post(f"/cas/{ca}/routes", {"added": [], "removed": [entry]})
 
 
