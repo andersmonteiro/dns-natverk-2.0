@@ -164,10 +164,24 @@ async def configure_repo(ca: str, data: ConfigureRepo, user=Depends(require_admi
 
 @router.get("/cas/{ca}/roas")
 async def list_roas(ca: str, user=Depends(get_current_user)):
-    data = await _get(f"/cas/{ca}/routes")
-    # Krill v0.16 returns {"authorized": [...]}
-    roas = data.get("authorized") or data.get("roas") or (data if isinstance(data, list) else [])
-    return {"roas": roas}
+    try:
+        data = await _get(f"/cas/{ca}/routes")
+        if isinstance(data, list):
+            roas = data
+        else:
+            roas = data.get("authorized") or data.get("roas") or []
+        # Ensure each ROA has primitive fields only
+        result = []
+        for r in roas:
+            if isinstance(r, dict):
+                result.append({
+                    "asn":        str(r.get("asn", "")),
+                    "prefix":     str(r.get("prefix", "")),
+                    "max_length": int(r["max_length"]) if r.get("max_length") is not None else None,
+                })
+        return {"roas": result}
+    except Exception as e:
+        return {"roas": [], "error": str(e)}
 
 
 class ROA(BaseModel):
@@ -197,4 +211,7 @@ async def remove_roa(ca: str, roa: RemoveROA, user=Depends(require_admin)):
 
 @router.get("/cas/{ca}/bgp")
 async def bgp_analysis(ca: str, user=Depends(get_current_user)):
-    return await _get(f"/cas/{ca}/bgp")
+    try:
+        return await _get(f"/cas/{ca}/bgp")
+    except Exception as e:
+        return {"announcements": [], "error": str(e)}

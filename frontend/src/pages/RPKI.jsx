@@ -394,8 +394,8 @@ function ConfigSection({ cas, onCaCreated }) {
             )}
           </div>
 
-          {/* Publisher Request */}
-          {hasParent && (
+          {/* Publisher Request — só mostra se o repositório ainda não foi configurado */}
+          {hasParent && !hasRepo && (
             <div>
               <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
                 4 · Publisher Request XML → registro.br
@@ -464,6 +464,7 @@ function ROASection({ ca }) {
       const r = await api.krillRoas(ca)
       const list = Array.isArray(r) ? r : (Array.isArray(r?.roas) ? r.roas : (Array.isArray(r?.authorized) ? r.authorized : []))
       setRoas(list)
+      if (r?.error) setStatusMsg({ ok: false, msg: `Krill: ${r.error}` })
     } catch (e) {
       setStatusMsg({ ok: false, msg: String(e.message) })
     } finally { setLoading(false) }
@@ -589,6 +590,7 @@ function BGPSection({ ca }) {
     try {
       const r = await api.krillBgp(ca)
       setData(r)
+      if (r?.error) setStatusMsg({ ok: false, msg: `BGP não disponível: ${r.error}` })
     } catch (e) {
       setStatusMsg({ ok: false, msg: String(e.message) })
     } finally { setLoading(false) }
