@@ -231,9 +231,6 @@ function CaDetailsPanel({ ca, section }) {
   if (loading) return <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8 }}><Loader size={13} /> Carregando...</div>
   if (!data)   return null
 
-  // DEBUG temporário — remove depois
-  console.log('[CaDetailsPanel]', section, JSON.stringify(data))
-
   // ── Parents ──────────────────────────────────────────────────────────────
   if (section === 'parents') {
     const parents = data.parents || []
@@ -319,22 +316,10 @@ function CaDetailsPanel({ ca, section }) {
                     <CopyVal value={value} />
                   </KrillTableRow>
                 ))}
-                {repo.last_exchange && (
-                  <KrillTableRow label="Last Exchange">
-                    <ExchangeCell ts={repo.last_exchange} ok={repo.last_ok} />
-                  </KrillTableRow>
-                )}
               </tbody>
             </table>
           </div>
         </div>
-        {/* DEBUG TEMPORÁRIO — remover depois */}
-        <details style={{ marginTop: 8 }}>
-          <summary style={{ fontSize: 11, color: 'var(--text-muted)', cursor: 'pointer' }}>🔍 Debug raw JSON (remover depois)</summary>
-          <pre style={{ fontSize: 10, color: 'var(--text-secondary)', background: 'var(--bg-panel)', padding: 8, borderRadius: 4, overflow: 'auto', marginTop: 4 }}>
-            {JSON.stringify(data, null, 2)}
-          </pre>
-        </details>
       </div>
     )
   }

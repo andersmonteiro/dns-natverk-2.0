@@ -365,10 +365,8 @@ async def ca_details(ca: str, user=Depends(get_current_user)):
             repo.update(_safe_repo_from(raw_repo))
 
         # Enrich with /repo endpoint
-        rd_raw: dict = {}
         try:
             rd = await _get(f"/cas/{ca}/repo")
-            rd_raw = rd if isinstance(rd, dict) else {}
             if isinstance(rd, dict):
                 repo.update(_safe_repo_from(rd))
                 # last_exchange — varre todos os níveis do dict recursivamente
@@ -408,7 +406,6 @@ async def ca_details(ca: str, user=Depends(get_current_user)):
             "parents":   parents,
             "resources": resources,
             "repo":      repo,
-            "_debug_rd": rd_raw,   # raw /repo — remover depois
         }
     except Exception as e:
         return {"handle": ca, "parents": [], "resources": {}, "repo": {}, "error": str(e)}
