@@ -59,23 +59,37 @@ export default function Dashboard() {
   const [unique, setUnique] = useState(null)
 
   const loadSystem = useCallback(async () => {
-    try { setSys(await api.system()) } catch {}
+    try { setSys(await api.system()) }
+    catch (e) { console.error('[Dashboard] system:', e) }
   }, [])
 
   const loadMetrics = useCallback(async () => {
-    try {
-      const bucket = range === '1h' ? '5m' : range === '6h' ? '15m' : '1h'
-      const [t, c, d, q, tot, u] = await Promise.all([
-        api.timeseries(range, bucket),
-        api.topClients(range, 8),
-        api.topDomains(range, 10),
-        api.qtypes(range),
-        api.total(range),
-        api.uniqueClients(range),
-      ])
-      setTs(t); setClients(c); setDomains(d); setQtypes(q)
-      setTotal(tot.total); setUnique(u.count)
-    } catch {}
+    const bucket = range === '1h' ? '5m' : range === '6h' ? '15m' : '1h'
+    const [rTs, rClients, rDomains, rQtypes, rTotal, rUnique] = await Promise.allSettled([
+      api.timeseries(range, bucket),
+      api.topClients(range, 8),
+      api.topDomains(range, 10),
+      api.qtypes(range),
+      api.total(range),
+      api.uniqueClients(range),
+    ])
+    if (rTs.status === 'fulfilled' && Array.isArray(rTs.value))       setTs(rTs.value)
+    else if (rTs.reason) console.error('[Dashboard] timeseries:', rTs.reason)
+
+    if (rClients.status === 'fulfilled' && Array.isArray(rClients.value)) setClients(rClients.value)
+    else if (rClients.reason) console.error('[Dashboard] topClients:', rClients.reason)
+
+    if (rDomains.status === 'fulfilled' && Array.isArray(rDomains.value)) setDomains(rDomains.value)
+    else if (rDomains.reason) console.error('[Dashboard] topDomains:', rDomains.reason)
+
+    if (rQtypes.status === 'fulfilled' && Array.isArray(rQtypes.value)) setQtypes(rQtypes.value)
+    else if (rQtypes.reason) console.error('[Dashboard] qtypes:', rQtypes.reason)
+
+    if (rTotal.status === 'fulfilled' && rTotal.value?.total != null) setTotal(rTotal.value.total)
+    else if (rTotal.reason) console.error('[Dashboard] total:', rTotal.reason)
+
+    if (rUnique.status === 'fulfilled' && rUnique.value?.count != null) setUnique(rUnique.value.count)
+    else if (rUnique.reason) console.error('[Dashboard] uniqueClients:', rUnique.reason)
   }, [range])
 
   const { tick } = useRefresh()

@@ -198,9 +198,9 @@ async def queries_timeseries_by_type(
 
 
 @router.get("/queries/by-hour")
-async def queries_by_hour(range: str = Query("24h"), user=Depends(get_current_user)):
+async def queries_by_hour(time_range: str = Query("24h", alias="range"), user=Depends(get_current_user)):
     """Distribuição de queries por hora do dia (0–23)."""
-    since = _range_to_ts(range)
+    since = _range_to_ts(time_range)
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute("""
@@ -212,7 +212,7 @@ async def queries_by_hour(range: str = Query("24h"), user=Depends(get_current_us
         rows = await cursor.fetchall()
 
     counts = {r["hour"]: r["count"] for r in rows}
-    return [{"hour": h, "label": f"{h:02d}h", "count": counts.get(h, 0)} for h in range(24)]
+    return [{"hour": h, "label": f"{h:02d}h", "count": counts.get(h, 0)} for h in list(range(24))]
 
 
 @router.get("/clients/unique")
