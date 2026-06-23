@@ -367,10 +367,10 @@ async def ca_details(ca: str, user=Depends(get_current_user)):
             rd = await _get(f"/cas/{ca}/repo")
             if isinstance(rd, dict):
                 repo.update(_safe_repo_from(rd))
-                # last_exchange — procura em vários níveis
-                for obj in (rd, rd.get("contact") or {}, rd.get("value") or {}):
-                    if not isinstance(obj, dict):
-                        continue
+                # last_exchange — varre todos os níveis do dict recursivamente
+                def _find_lex(obj, depth=0):
+                    if depth > 4 or not isinstance(obj, dict):
+                        return
                     for lex_key in ("last_exchange", "last_cms_msg", "last_response"):
                         raw_lex = obj.get(lex_key)
                         if raw_lex is not None:
@@ -378,11 +378,26 @@ async def ca_details(ca: str, user=Depends(get_current_user)):
                             if ts:
                                 repo["last_exchange"] = ts
                                 repo["last_ok"]       = ok
-                            break
-                    if repo.get("last_exchange"):
-                        break
+                            return
+                    for v in obj.values():
+                        if isinstance(v, dict):
+                            _find_lex(v, depth + 1)
+                            if repo.get("last_exchange"):
+                                return
+                _find_lex(rd)
         except Exception:
             pass
+
+        # Fallback: last_exchange do repo pode estar no detail da CA
+        if not repo.get("last_exchange"):
+            for field in ("repo_last_exchange", "last_exchange", "repo_status"):
+                raw_lex = detail.get(field)
+                if raw_lex is not None:
+                    ts, ok = _extract_lex(raw_lex)
+                    if ts:
+                        repo["last_exchange"] = ts
+                        repo["last_ok"]       = ok
+                    break
 
         return {
             "handle":    str(detail.get("handle", ca)),

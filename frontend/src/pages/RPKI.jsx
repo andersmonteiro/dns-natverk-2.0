@@ -263,10 +263,25 @@ function CaDetailsPanel({ ca, section }) {
                   </KrillTableRow>
                   {(res.asn || res.ipv4?.length || res.ipv6?.length) && (
                     <KrillTableRow label="All Resources">
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {res.asn && <span style={{ color: 'var(--text-primary)' }}>ASN: {res.asn}</span>}
-                        {res.ipv4?.length > 0 && <span style={{ color: 'var(--text-primary)' }}>IPv4: {res.ipv4.join(', ')}</span>}
-                        {res.ipv6?.length > 0 && <span style={{ color: 'var(--text-primary)' }}>IPv6: {res.ipv6.join(', ')}</span>}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {res.asn && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ color: 'var(--text-muted)', fontSize: 11, minWidth: 34 }}>ASN</span>
+                            <CopyVal value={res.asn} />
+                          </div>
+                        )}
+                        {res.ipv4?.map(ip => (
+                          <div key={ip} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ color: 'var(--text-muted)', fontSize: 11, minWidth: 34 }}>IPv4</span>
+                            <CopyVal value={ip} />
+                          </div>
+                        ))}
+                        {res.ipv6?.map(ip => (
+                          <div key={ip} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ color: 'var(--text-muted)', fontSize: 11, minWidth: 34 }}>IPv6</span>
+                            <CopyVal value={ip} />
+                          </div>
+                        ))}
                       </div>
                     </KrillTableRow>
                   )}
