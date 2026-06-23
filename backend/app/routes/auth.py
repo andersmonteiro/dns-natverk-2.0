@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
+from datetime import datetime
 import aiosqlite
 from ..auth import verify_password, create_token, get_current_user
 from ..db import DB_PATH
@@ -9,7 +10,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.post("/login")
-async def login(form: OAuth2PasswordRequestForm = Depends()):
+async def login(request: Request, form: OAuth2PasswordRequestForm = Depends()):
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute("SELECT * FROM users WHERE username = ?", (form.username,))
@@ -17,6 +18,20 @@ async def login(form: OAuth2PasswordRequestForm = Depends()):
 
     if not user or not verify_password(form.password, user["password"]):
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
+
+    # Captura IP e User-Agent
+    ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "")
+    if ip and "," in ip:
+        ip = ip.split(",")[0].strip()
+    ua = request.headers.get("user-agent", "")
+    now = datetime.utcnow().isoformat()
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE users SET last_login_at=?, last_login_ip=?, last_login_ua=? WHERE username=?",
+            (now, ip, ua, form.username)
+        )
+        await db.commit()
 
     token = create_token({"sub": user["username"], "role": user["role"]})
     return {"access_token": token, "token_type": "bearer", "role": user["role"]}

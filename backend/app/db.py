@@ -73,6 +73,18 @@ async def init_db():
         await db.executescript(SCHEMA)
         await db.commit()
 
+        # Migrations — adiciona colunas novas sem quebrar DB existente
+        for col, definition in [
+            ("last_login_at", "DATETIME"),
+            ("last_login_ip", "TEXT"),
+            ("last_login_ua", "TEXT"),
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
+                await db.commit()
+            except Exception:
+                pass  # coluna já existe
+
         # Admin padrão se não existir
         from passlib.context import CryptContext
         pwd = CryptContext(schemes=["bcrypt"])
