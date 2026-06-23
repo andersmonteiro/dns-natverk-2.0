@@ -23,7 +23,7 @@ class RoleChange(BaseModel):
 
 
 @router.get("/")
-async def list_users(user=Depends(require_admin)):
+async def list_users(user=Depends(get_current_user)):
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute(

@@ -91,7 +91,7 @@ export const api = {
   listUsers:      () => request('/users/'),
   createUser:     (data) => request('/users/', { method: 'POST', body: JSON.stringify(data) }),
   deleteUser:     (id) => request(`/users/${id}`, { method: 'DELETE' }),
-  changeRole:     (id, role) => request(`/users/${id}/role`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+  changeRole:     (id, role) => request(`/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
   changePassword: (current_password, new_password) =>
     request('/users/me/password', { method: 'POST', body: JSON.stringify({ current_password, new_password }) }),
 

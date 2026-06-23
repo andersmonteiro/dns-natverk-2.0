@@ -27,6 +27,7 @@ export default function Users() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [formError, setFormError] = useState('')
   const [me, setMe] = useState(null)
 
   // New user form
@@ -53,7 +54,7 @@ export default function Users() {
     e.preventDefault()
     if (!newUsername.trim() || !newPassword.trim()) return
     setAdding(true)
-    setError('')
+    setFormError('')
     try {
       await api.createUser({ username: newUsername.trim(), password: newPassword, role: newRole })
       setNewUsername('')
@@ -61,7 +62,7 @@ export default function Users() {
       setNewRole('viewer')
       await load()
     } catch (e) {
-      setError(e.message)
+      setFormError(e.message)
     } finally {
       setAdding(false)
     }
@@ -102,39 +103,41 @@ export default function Users() {
         <UsersIcon size={20} color="var(--accent)" /> Usuários
       </h1>
 
-      <Panel title="Novo usuário">
-        <form onSubmit={addUser} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <input
-            value={newUsername}
-            onChange={e => setNewUsername(e.target.value)}
-            placeholder="Username"
-            required
-            style={{ ...inputStyle, flex: '1 1 150px' }}
-          />
-          <input
-            value={newPassword}
-            onChange={e => setNewPassword(e.target.value)}
-            type="password"
-            placeholder="Senha"
-            required
-            style={{ ...inputStyle, flex: '1 1 150px' }}
-          />
-          <select value={newRole} onChange={e => setNewRole(e.target.value)} style={{ ...inputStyle, flex: '0 0 120px' }}>
-            {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
-          <button type="submit" disabled={adding} style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '8px 16px', background: 'var(--accent)',
-            border: 'none', borderRadius: 'var(--r-sm)',
-            color: '#fff', fontSize: 13, fontWeight: 600,
-            cursor: adding ? 'not-allowed' : 'pointer',
-          }}>
-            {adding ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={14} />}
-            Criar
-          </button>
-        </form>
-        {error && <div style={{ marginTop: 8, color: 'var(--red)', fontSize: 12 }}>{error}</div>}
-      </Panel>
+      {me?.role === 'admin' && (
+        <Panel title="Novo usuário">
+          <form onSubmit={addUser} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input
+              value={newUsername}
+              onChange={e => setNewUsername(e.target.value)}
+              placeholder="Username"
+              required
+              style={{ ...inputStyle, flex: '1 1 150px' }}
+            />
+            <input
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              type="password"
+              placeholder="Senha"
+              required
+              style={{ ...inputStyle, flex: '1 1 150px' }}
+            />
+            <select value={newRole} onChange={e => setNewRole(e.target.value)} style={{ ...inputStyle, flex: '0 0 120px' }}>
+              {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <button type="submit" disabled={adding} style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', background: 'var(--accent)',
+              border: 'none', borderRadius: 'var(--r-sm)',
+              color: '#fff', fontSize: 13, fontWeight: 600,
+              cursor: adding ? 'not-allowed' : 'pointer',
+            }}>
+              {adding ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={14} />}
+              Criar
+            </button>
+          </form>
+          {formError && <div style={{ marginTop: 8, color: 'var(--red)', fontSize: 12 }}>{formError}</div>}
+        </Panel>
+      )}
 
       <Panel title="Usuários cadastrados" subtitle={`${users.length} contas`}>
         {loading ? (
