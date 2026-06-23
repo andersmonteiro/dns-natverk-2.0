@@ -137,9 +137,9 @@ function FileUploadButton({ onLoad, label = 'Carregar arquivo .xml' }) {
   )
 }
 
-// ── Painel de detalhes dinâmicos da CA (Parents + Repo) ──────────────────────
+// ── Painel de detalhes da CA — estilo Krill ──────────────────────────────────
 
-const REPO_LABELS = {
+const REPO_FIELD_LABELS = {
   base_uri:              'SIA Base (rsync)',
   rpki_notify:           'RRDP Notification URI',
   sia_base:              'SIA Base (rsync)',
@@ -148,124 +148,165 @@ const REPO_LABELS = {
   publisher_handle:      'Publisher Handle',
 }
 
-function InfoRow({ label, value }) {
-  if (!value) return null
+function relativeTime(ts) {
+  if (!ts) return ''
+  const ms = (String(ts).length <= 10 ? Number(ts) * 1000 : Number(ts))
+  if (isNaN(ms)) return String(ts)
+  const diffSec = Math.floor((Date.now() - ms) / 1000)
+  if (diffSec < 60)   return `${diffSec} segundos atrás`
+  if (diffSec < 3600) return `${Math.floor(diffSec/60)} minutos atrás`
+  if (diffSec < 86400) return `${Math.floor(diffSec/3600)} horas atrás`
+  return `${Math.floor(diffSec/86400)} dias atrás`
+}
+
+function formatUtc(ts) {
+  if (!ts) return ''
+  const ms = (String(ts).length <= 10 ? Number(ts) * 1000 : Number(ts))
+  if (isNaN(ms)) return String(ts)
+  return new Date(ms).toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC')
+}
+
+function KrillTableRow({ label, children }) {
   return (
-    <tr>
-      <td style={{ padding: '5px 14px 5px 0', color: 'var(--text-muted)', whiteSpace: 'nowrap', verticalAlign: 'top', fontSize: 12 }}>{label}</td>
-      <td style={{ padding: '5px 0', fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all', color: 'var(--text-primary)' }}>
-        {value}
-        <button onClick={() => navigator.clipboard.writeText(value)}
-          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0 4px', opacity: 0.5, verticalAlign: 'middle' }}>
-          <Copy size={10} color="var(--text-muted)" />
-        </button>
-      </td>
+    <tr style={{ borderBottom: '1px solid var(--border-dim)' }}>
+      <td style={{
+        padding: '10px 20px 10px 0', color: 'var(--text-muted)',
+        whiteSpace: 'nowrap', verticalAlign: 'top', fontSize: 12, fontWeight: 600, width: 160,
+      }}>{label}</td>
+      <td style={{ padding: '10px 0', fontSize: 12, wordBreak: 'break-all' }}>{children}</td>
     </tr>
   )
 }
 
-function LastExchange({ ts, result }) {
-  if (!ts) return null
-  const ok = !result || result.toLowerCase().includes('ok') || result.toLowerCase().includes('success')
+function CopyVal({ value }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginTop: 6 }}>
-      {ok
-        ? <CheckCircle size={13} color="var(--green)" />
-        : <XCircle size={13} color="var(--red)" />}
-      <span style={{ color: 'var(--text-secondary)' }}>Último contato: {ts}</span>
-      {result && !ok && <span style={{ color: 'var(--red)', fontSize: 11 }}>({result})</span>}
-    </div>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <span style={{ fontFamily: 'monospace', color: 'var(--accent)' }}>{value}</span>
+      <button onClick={() => navigator.clipboard.writeText(value)}
+        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0 2px', opacity: 0.5 }}>
+        <Copy size={10} color="var(--text-muted)" />
+      </button>
+    </span>
+  )
+}
+
+function ExchangeCell({ ts, ok }) {
+  if (!ts) return <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
+  const utc = formatUtc(ts)
+  const rel = relativeTime(ts)
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      {ok !== false
+        ? <CheckCircle size={14} color="var(--green)" />
+        : <XCircle    size={14} color="var(--red)" />}
+      <span style={{ color: ok !== false ? 'var(--green)' : 'var(--red)' }}>
+        {utc}{rel ? ` (${rel})` : ''}
+      </span>
+    </span>
   )
 }
 
 function CaDetailsPanel({ ca, section }) {
-  const [data, setData]     = useState(null)
+  const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(false)
 
   const load = useCallback(async () => {
     if (!ca) return
     setLoading(true)
-    try {
-      const r = await api.krillCaDetails(ca)
-      setData(r)
-    } catch { setData(null) }
+    try { setData(await api.krillCaDetails(ca)) }
+    catch { setData(null) }
     finally { setLoading(false) }
   }, [ca])
 
   useEffect(() => { load() }, [load])
 
-  if (loading) return <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8 }}><Loader size={13} /> Carregando...</div>
-  if (!data) return null
+  const refreshBtn = (
+    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+      <button onClick={load} disabled={loading} style={{ ...btn('ghost'), padding: '4px 10px' }}>
+        <RefreshCw size={12} /> Atualizar
+      </button>
+    </div>
+  )
 
+  if (loading) return <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8 }}><Loader size={13} /> Carregando...</div>
+  if (!data)   return null
+
+  // ── Parents ──────────────────────────────────────────────────────────────
   if (section === 'parents') {
     const parents = data.parents || []
     const res     = data.resources || {}
     return (
       <div style={{ marginTop: 8 }}>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-          <button onClick={load} style={{ ...btn('ghost'), padding: '4px 10px' }}>
-            <RefreshCw size={12} /> Atualizar
-          </button>
-        </div>
+        {refreshBtn}
         {parents.map(p => (
           <div key={p.handle} style={{
-            padding: '12px 14px', background: 'var(--bg-panel)',
-            border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', marginBottom: 8,
+            border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+            overflow: 'hidden', marginBottom: 10,
           }}>
-            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{p.handle}</div>
-            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-              <tbody>
-                <InfoRow label="Contact URI" value={p.contact} />
-              </tbody>
-            </table>
-            <LastExchange ts={p.last_exchange} result={p.last_result} />
+            {/* Header — nome do parent */}
+            <div style={{
+              padding: '10px 16px', background: 'var(--bg-panel)',
+              borderBottom: '1px solid var(--border)',
+              fontWeight: 700, fontSize: 13, color: 'var(--text-primary)',
+            }}>{p.handle}</div>
+            <div style={{ padding: '0 16px', background: 'var(--bg-canvas)' }}>
+              <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                <tbody>
+                  <KrillTableRow label="Parents">
+                    {p.contact ? <CopyVal value={p.contact} /> : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                  </KrillTableRow>
+                  <KrillTableRow label="Last Exchange">
+                    <ExchangeCell ts={p.last_exchange} ok={p.last_ok} />
+                  </KrillTableRow>
+                  {(res.asn || res.ipv4?.length || res.ipv6?.length) && (
+                    <KrillTableRow label="All Resources">
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {res.asn && <span style={{ color: 'var(--text-primary)' }}>ASN: {res.asn}</span>}
+                        {res.ipv4?.length > 0 && <span style={{ color: 'var(--text-primary)' }}>IPv4: {res.ipv4.join(', ')}</span>}
+                        {res.ipv6?.length > 0 && <span style={{ color: 'var(--text-primary)' }}>IPv6: {res.ipv6.join(', ')}</span>}
+                      </div>
+                    </KrillTableRow>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         ))}
-        {(res.asn || res.ipv4?.length || res.ipv6?.length) && (
-          <div style={{
-            padding: '10px 14px', background: 'var(--bg-panel)',
-            border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-          }}>
-            <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Recursos delegados</div>
-            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-              <tbody>
-                {res.asn  && <InfoRow label="ASN"  value={res.asn} />}
-                {res.ipv4?.length > 0 && <InfoRow label="IPv4" value={res.ipv4.join(', ')} />}
-                {res.ipv6?.length > 0 && <InfoRow label="IPv6" value={res.ipv6.join(', ')} />}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
     )
   }
 
+  // ── Repo ─────────────────────────────────────────────────────────────────
   if (section === 'repo') {
     const repo = data.repo || {}
-    const rows = Object.entries(repo)
-      .filter(([k, v]) => v && k !== 'last_exchange' && k !== 'last_result')
-      .map(([k, v]) => [REPO_LABELS[k] || k, String(v)])
+    const uri  = repo.service_uri || repo.publisher_handle || ''
+    const skip = new Set(['last_exchange', 'last_ok', 'last_result', 'service_uri', 'publisher_handle'])
+    const extraRows = Object.entries(repo)
+      .filter(([k, v]) => !skip.has(k) && v)
+      .map(([k, v]) => [REPO_FIELD_LABELS[k] || k, String(v)])
     return (
       <div style={{ marginTop: 8 }}>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-          <button onClick={load} style={{ ...btn('ghost'), padding: '4px 10px' }}>
-            <RefreshCw size={12} /> Atualizar
-          </button>
-        </div>
-        <div style={{
-          padding: '12px 14px', background: 'var(--bg-panel)',
-          border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-        }}>
-          {rows.length > 0 ? (
+        {refreshBtn}
+        <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', overflow: 'hidden' }}>
+          <div style={{ padding: '0 16px', background: 'var(--bg-canvas)' }}>
             <table style={{ borderCollapse: 'collapse', width: '100%' }}>
               <tbody>
-                {rows.map(([label, value]) => <InfoRow key={label} label={label} value={value} />)}
+                {uri && (
+                  <KrillTableRow label="URI">
+                    <CopyVal value={uri} />
+                  </KrillTableRow>
+                )}
+                {extraRows.map(([label, value]) => (
+                  <KrillTableRow key={label} label={label}>
+                    <CopyVal value={value} />
+                  </KrillTableRow>
+                ))}
+                <KrillTableRow label="Last Exchange">
+                  <ExchangeCell ts={repo.last_exchange} ok={repo.last_ok} />
+                </KrillTableRow>
               </tbody>
             </table>
-          ) : (
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Dados do repositório não disponíveis.</span>
-          )}
-          <LastExchange ts={repo.last_exchange} result={repo.last_result} />
+          </div>
         </div>
       </div>
     )
@@ -520,9 +561,8 @@ function ConfigSection({ cas, onCaCreated }) {
           {/* 3 · Publisher Request XML → registro.br */}
           {hasParent && (
             <div>
-              <h3 style={{ fontSize: 12, fontWeight: 700, color: hasRepo ? 'var(--green)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+              <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
                 3 · Publisher Request XML → registro.br
-                {hasRepo && <span style={{ marginLeft: 8 }}><CheckCircle size={12} /></span>}
               </h3>
               {hasRepo && !repoXml ? (
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
