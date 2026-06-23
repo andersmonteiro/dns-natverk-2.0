@@ -93,6 +93,22 @@ async def seed_whitelist(data: SeedIn, user=Depends(require_admin)):
     return {"ok": True, "inserted": inserted, "skipped": skipped}
 
 
+@router.post("/bulk-remove")
+async def bulk_remove_whitelist(data: SeedIn, user=Depends(require_admin)):
+    removed = 0
+    async with aiosqlite.connect(DB_PATH) as db:
+        for domain in data.domains:
+            cursor = await db.execute("DELETE FROM whitelist_domain WHERE domain = ?", (domain,))
+            removed += cursor.rowcount
+        await db.execute(
+            "INSERT INTO audit_log (username, action, detail) VALUES (?, ?, ?)",
+            (user["username"], "whitelist_bulk_remove", f"count={removed}")
+        )
+        await db.commit()
+    await rebuild_blocks_conf()
+    return {"ok": True, "removed": removed}
+
+
 @router.delete("/{domain}")
 async def remove_whitelist(domain: str, user=Depends(require_admin)):
     async with aiosqlite.connect(DB_PATH) as db:

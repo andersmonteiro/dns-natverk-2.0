@@ -74,14 +74,16 @@ export const api = {
   // Bloqueios
   listBlocks:   () => request('/blocks/'),
   addBlock:     (domain) => request('/blocks/', { method: 'POST', body: JSON.stringify({ domain }) }),
-  removeBlock:  (domain) => request(`/blocks/${domain}`, { method: 'DELETE' }),
+  removeBlock:      (domain) => request(`/blocks/${domain}`, { method: 'DELETE' }),
+  bulkRemoveBlocks: (domains) => request('/blocks/bulk-remove', { method: 'POST', body: JSON.stringify({ domains }) }),
 
   // Whitelist
-  listWhitelist:    () => request('/whitelist/'),
-  addWhitelist:     (domain, reason) => request('/whitelist/', { method: 'POST', body: JSON.stringify({ domain, reason }) }),
-  removeWhitelist:  (domain) => request(`/whitelist/${encodeURIComponent(domain)}`, { method: 'DELETE' }),
-  whitelistDefaults: () => request('/whitelist/defaults'),
-  whitelistSeed:    (domains) => request('/whitelist/seed', { method: 'POST', body: JSON.stringify({ domains }) }),
+  listWhitelist:       () => request('/whitelist/'),
+  addWhitelist:        (domain, reason) => request('/whitelist/', { method: 'POST', body: JSON.stringify({ domain, reason }) }),
+  removeWhitelist:     (domain) => request(`/whitelist/${encodeURIComponent(domain)}`, { method: 'DELETE' }),
+  bulkRemoveWhitelist: (domains) => request('/whitelist/bulk-remove', { method: 'POST', body: JSON.stringify({ domains }) }),
+  whitelistDefaults:   () => request('/whitelist/defaults'),
+  whitelistSeed:       (domains) => request('/whitelist/seed', { method: 'POST', body: JSON.stringify({ domains }) }),
 
   // Auditoria
   listAudit: (params = {}) => {

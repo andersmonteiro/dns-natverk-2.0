@@ -108,6 +108,9 @@ async def rebuild_blocks_conf() -> None:
 class DomainIn(BaseModel):
     domain: str
 
+class BulkDomainsIn(BaseModel):
+    domains: list[str]
+
 
 @router.get("/")
 async def list_blocked(user=Depends(get_current_user)):
@@ -153,6 +156,22 @@ async def add_block(data: DomainIn, user=Depends(require_admin)):
 
     await rebuild_blocks_conf()
     return {"ok": True, "domain": domain}
+
+
+@router.post("/bulk-remove")
+async def bulk_remove_blocks(data: BulkDomainsIn, user=Depends(require_admin)):
+    removed = 0
+    async with aiosqlite.connect(DB_PATH) as db:
+        for domain in data.domains:
+            cursor = await db.execute("DELETE FROM blocked_domain WHERE domain = ?", (domain,))
+            removed += cursor.rowcount
+        await db.execute(
+            "INSERT INTO audit_log (username, action, detail) VALUES (?, ?, ?)",
+            (user["username"], "block_bulk_remove", f"count={removed}")
+        )
+        await db.commit()
+    await rebuild_blocks_conf()
+    return {"ok": True, "removed": removed}
 
 
 @router.delete("/{domain:path}")

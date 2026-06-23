@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ShieldCheck, Plus, Trash2, Loader, ChevronDown, ChevronRight, CheckCircle2, Sparkles } from 'lucide-react'
+import { ShieldCheck, Plus, Trash2, Loader, ChevronDown, ChevronRight, CheckCircle2, Sparkles, Square } from 'lucide-react'
 import { api } from '../api'
 import Panel from '../components/Panel'
 import { useIsAdmin } from '../context/UserContext'
@@ -192,12 +192,14 @@ function DefaultsPanel({ onAdded }) {
 // ── Página principal ────────────────────────────────────────────────────────
 
 export default function Whitelist() {
-  const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [domain, setDomain] = useState('')
-  const [reason, setReason] = useState('')
-  const [adding, setAdding] = useState(false)
-  const [error, setError] = useState('')
+  const [items, setItems]       = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [domain, setDomain]     = useState('')
+  const [reason, setReason]     = useState('')
+  const [adding, setAdding]     = useState(false)
+  const [error, setError]       = useState('')
+  const [selected, setSelected] = useState(new Set())
+  const [removing, setRemoving] = useState(false)
   const isAdmin = useIsAdmin()
 
   async function load() {
@@ -209,9 +211,28 @@ export default function Whitelist() {
     } finally {
       setLoading(false)
     }
+    setSelected(new Set())
   }
 
   useEffect(() => { load() }, [])
+
+  function toggleSelect(domain) {
+    setSelected(prev => {
+      const s = new Set(prev)
+      s.has(domain) ? s.delete(domain) : s.add(domain)
+      return s
+    })
+  }
+
+  async function removeSelected() {
+    if (!selected.size) return
+    setRemoving(true)
+    try {
+      await api.bulkRemoveWhitelist([...selected])
+      await load()
+    } catch {}
+    finally { setRemoving(false) }
+  }
 
   async function add(e) {
     e.preventDefault()
@@ -297,7 +318,23 @@ export default function Whitelist() {
         </Panel>
       )}
 
-      <Panel title="Domínios liberados" subtitle={`${items.length} entrada${items.length !== 1 ? 's' : ''}`}>
+      <Panel
+        title="Domínios liberados"
+        subtitle={`${items.length} entrada${items.length !== 1 ? 's' : ''}`}
+        action={isAdmin && selected.size > 0 ? (
+          <button onClick={removeSelected} disabled={removing} style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '6px 12px', background: 'var(--red)', border: 'none',
+            borderRadius: 'var(--r-sm)', color: '#fff', fontSize: 12, fontWeight: 600,
+            cursor: removing ? 'not-allowed' : 'pointer',
+          }}>
+            {removing
+              ? <Loader size={12} style={{ animation: 'spin 1s linear infinite' }} />
+              : <Trash2 size={12} />}
+            Remover {selected.size}
+          </button>
+        ) : null}
+      >
         {loading ? (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>Carregando…</div>
         ) : items.length === 0 ? (
@@ -306,6 +343,18 @@ export default function Whitelist() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                {isAdmin && (
+                  <th style={{ padding: '8px 10px', width: 32 }}>
+                    <input type="checkbox"
+                      checked={items.length > 0 && items.every(i => selected.has(i.domain))}
+                      onChange={() => {
+                        const all = items.every(i => selected.has(i.domain))
+                        setSelected(all ? new Set() : new Set(items.map(i => i.domain)))
+                      }}
+                      style={{ cursor: 'pointer', accentColor: 'var(--green)' }}
+                    />
+                  </th>
+                )}
                 {['Domínio', 'Motivo', 'Origem', 'Data', isAdmin ? '' : null].filter(Boolean).map(h => (
                   <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--text-muted)', fontWeight: 600, fontSize: 11 }}>{h}</th>
                 ))}
@@ -313,10 +362,17 @@ export default function Whitelist() {
             </thead>
             <tbody>
               {items.map(item => (
-                <tr key={item.domain} style={{ borderBottom: '1px solid var(--border-dim)' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-panel-2)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                <tr key={item.domain}
+                  style={{ borderBottom: '1px solid var(--border-dim)', background: selected.has(item.domain) ? 'rgba(var(--green-rgb,34,197,94),.08)' : 'transparent' }}
+                  onMouseEnter={e => { if (!selected.has(item.domain)) e.currentTarget.style.background = 'var(--bg-panel-2)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = selected.has(item.domain) ? 'rgba(var(--green-rgb,34,197,94),.08)' : 'transparent' }}
                 >
+                  {isAdmin && (
+                    <td style={{ padding: '9px 10px' }}>
+                      <input type="checkbox" checked={selected.has(item.domain)} onChange={() => toggleSelect(item.domain)}
+                        style={{ cursor: 'pointer', accentColor: 'var(--green)' }} />
+                    </td>
+                  )}
                   <td style={{ padding: '9px 10px', color: 'var(--green)', fontWeight: 600, fontFamily: 'monospace' }}>{item.domain}</td>
                   <td style={{ padding: '9px 10px', color: 'var(--text-secondary)' }}>{item.reason || '—'}</td>
                   <td style={{ padding: '9px 10px' }}>
@@ -335,12 +391,13 @@ export default function Whitelist() {
                   {isAdmin && (
                     <td style={{ padding: '9px 10px', textAlign: 'right' }}>
                       <button onClick={() => remove(item.domain)} style={{
-                        background: 'transparent', border: '1px solid var(--red-dim)',
-                        borderRadius: 'var(--r-sm)', color: 'var(--red)',
-                        padding: '4px 8px', cursor: 'pointer', fontSize: 11,
-                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                      }}>
-                        <Trash2 size={12} /> Remover
+                        background: 'transparent', border: 'none', color: 'var(--text-muted)',
+                        cursor: 'pointer', padding: 4, borderRadius: 4,
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                      title="Remover">
+                        <Trash2 size={14} />
                       </button>
                     </td>
                   )}
