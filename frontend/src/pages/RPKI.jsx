@@ -231,6 +231,9 @@ function CaDetailsPanel({ ca, section }) {
   if (loading) return <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8 }}><Loader size={13} /> Carregando...</div>
   if (!data)   return null
 
+  // DEBUG temporário — remove depois
+  console.log('[CaDetailsPanel]', section, JSON.stringify(data))
+
   // ── Parents ──────────────────────────────────────────────────────────────
   if (section === 'parents') {
     const parents = data.parents || []

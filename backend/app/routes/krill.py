@@ -234,6 +234,51 @@ async def ca_raw_debug(ca: str, user=Depends(get_current_user)):
     return out
 
 
+def _parse_parents(raw) -> list:
+    """Normaliza parents do Krill — aceita dict ou lista."""
+    result = []
+    if isinstance(raw, dict):
+        for handle, info in raw.items():
+            p = {"handle": str(handle), "contact": _extract_uri(info),
+                 "last_exchange": "", "last_ok": None}
+            # last_exchange pode estar dentro de info diretamente
+            if isinstance(info, dict):
+                for lex_key in ("last_exchange", "last_cms_msg", "last_response"):
+                    if info.get(lex_key) is not None:
+                        ts, ok = _extract_lex(info[lex_key])
+                        p["last_exchange"] = ts
+                        p["last_ok"]       = ok
+                        break
+            result.append(p)
+    elif isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            handle = str(item.get("handle", item.get("name", "")))
+            if not handle:
+                continue
+            p = {"handle": handle, "contact": _extract_uri(item),
+                 "last_exchange": "", "last_ok": None}
+            for lex_key in ("last_exchange", "last_cms_msg", "last_response"):
+                if item.get(lex_key) is not None:
+                    ts, ok = _extract_lex(item[lex_key])
+                    p["last_exchange"] = ts
+                    p["last_ok"]       = ok
+                    break
+            result.append(p)
+    return result
+
+
+def _str_list(v) -> list:
+    """Converte string CSV ou lista para lista de strings."""
+    if not v:
+        return []
+    if isinstance(v, list):
+        return [str(x) for x in v if x]
+    # "138.99.108.0/22, 177.130.48.0/20" → [...]
+    return [x.strip() for x in str(v).split(",") if x.strip()]
+
+
 @router.get("/cas/{ca}/details")
 async def ca_details(ca: str, user=Depends(get_current_user)):
     """Detalhes da CA (parents, recursos, repo) como primitivos — sem objetos aninhados."""
@@ -242,47 +287,40 @@ async def ca_details(ca: str, user=Depends(get_current_user)):
 
         # ── parents ──────────────────────────────────────────────────────────
         raw_parents = detail.get("parents") or {}
-        parents: list = []
-        if isinstance(raw_parents, dict):
-            for handle, info in raw_parents.items():
-                p: dict = {"handle": str(handle), "contact": "", "last_exchange": "", "last_ok": None}
-                p["contact"] = _extract_uri(info)
-                parents.append(p)
+        parents = _parse_parents(raw_parents)
 
-        # Enriquece com /parents (last_exchange e contact mais rico)
+        # Enriquece com /cas/{ca}/parents — pode ser dict ou lista
         try:
             pd = await _get(f"/cas/{ca}/parents")
-            if isinstance(pd, dict):
-                for p in parents:
-                    entry = pd.get(p["handle"]) or {}
-                    if isinstance(entry, dict):
-                        # Tenta vários campos de last_exchange
-                        lex_raw = (entry.get("last_exchange") or entry.get("last_response")
-                                   or entry.get("last_cms_msg") or entry.get("last_ok"))
-                        if lex_raw is not None:
-                            ts, ok = _extract_lex(lex_raw)
-                            p["last_exchange"] = ts
-                            p["last_ok"]       = ok
-                        # contact mais rico
-                        c = _extract_uri(entry)
-                        if c and not p["contact"]:
-                            p["contact"] = c
+            extra = _parse_parents(pd)
+            # Merge: atualiza last_exchange e contact que estejam vazios
+            by_handle = {ep["handle"]: ep for ep in extra}
+            for p in parents:
+                ep = by_handle.get(p["handle"]) or {}
+                if ep.get("last_exchange") and not p["last_exchange"]:
+                    p["last_exchange"] = ep["last_exchange"]
+                    p["last_ok"]       = ep["last_ok"]
+                if ep.get("contact") and not p["contact"]:
+                    p["contact"] = ep["contact"]
+            # Se parents estava vazio, usa o resultado de /parents diretamente
+            if not parents and extra:
+                parents = extra
         except Exception:
             pass
 
-        # Tenta /parents/{handle} individualmente caso /parents não trouxe last_exchange
+        # Tenta /parents/{handle} individualmente para last_exchange
         for p in parents:
             if p.get("last_exchange"):
                 continue
             try:
                 ep = await _get(f"/cas/{ca}/parents/{p['handle']}")
                 if isinstance(ep, dict):
-                    lex_raw = (ep.get("last_exchange") or ep.get("last_response")
-                               or ep.get("last_cms_msg"))
-                    if lex_raw is not None:
-                        ts, ok = _extract_lex(lex_raw)
-                        p["last_exchange"] = ts
-                        p["last_ok"]       = ok
+                    for lex_key in ("last_exchange", "last_cms_msg", "last_response"):
+                        if ep.get(lex_key) is not None:
+                            ts, ok = _extract_lex(ep[lex_key])
+                            p["last_exchange"] = ts
+                            p["last_ok"]       = ok
+                            break
                     c = _extract_uri(ep)
                     if c and not p["contact"]:
                         p["contact"] = c
@@ -293,12 +331,9 @@ async def ca_details(ca: str, user=Depends(get_current_user)):
         raw_res = detail.get("resources") or {}
         resources: dict = {"asn": "", "ipv4": [], "ipv6": []}
         if isinstance(raw_res, dict):
-            asn  = raw_res.get("asn",  raw_res.get("AS",  ""))
-            ipv4 = raw_res.get("ipv4", raw_res.get("v4",  []))
-            ipv6 = raw_res.get("ipv6", raw_res.get("v6",  []))
-            resources["asn"]  = str(asn) if asn else ""
-            resources["ipv4"] = [str(x) for x in (ipv4 if isinstance(ipv4, list) else [ipv4]) if x]
-            resources["ipv6"] = [str(x) for x in (ipv6 if isinstance(ipv6, list) else [ipv6]) if x]
+            resources["asn"]  = str(raw_res.get("asn", raw_res.get("AS", "")) or "")
+            resources["ipv4"] = _str_list(raw_res.get("ipv4", raw_res.get("v4", [])))
+            resources["ipv6"] = _str_list(raw_res.get("ipv6", raw_res.get("v6", [])))
 
         # ── repo ─────────────────────────────────────────────────────────────
         repo: dict = {}
@@ -307,21 +342,24 @@ async def ca_details(ca: str, user=Depends(get_current_user)):
             for k, v in raw_repo.items():
                 if isinstance(v, (str, int)) and v:
                     repo[str(k)] = str(v)
+
         # Enrich with /repo endpoint
         try:
             rd = await _get(f"/cas/{ca}/repo")
             if isinstance(rd, dict):
-                # contact sub-object
-                contact_obj = rd.get("contact") or rd
-                if isinstance(contact_obj, dict):
-                    for k, v in contact_obj.items():
-                        if isinstance(v, (str, int)) and v and str(k) not in repo:
-                            repo[str(k)] = str(v)
-                # last_exchange — Krill v0.16 pode ter vários formatos
+                # Varre recursivamente à procura de strings úteis
+                def _flatten(obj, prefix=""):
+                    if isinstance(obj, dict):
+                        for k, v in obj.items():
+                            _flatten(v, k)
+                    elif isinstance(obj, (str, int)) and obj:
+                        if prefix and prefix not in repo and prefix not in ("tag",):
+                            repo[prefix] = str(obj)
+                _flatten(rd)
+                # last_exchange
                 for lex_key in ("last_exchange", "last_cms_msg", "last_response"):
-                    lex_raw = rd.get(lex_key)
-                    if lex_raw is not None:
-                        ts, ok = _extract_lex(lex_raw)
+                    if rd.get(lex_key) is not None:
+                        ts, ok = _extract_lex(rd[lex_key])
                         if ts:
                             repo["last_exchange"] = ts
                             repo["last_ok"]       = ok
@@ -334,6 +372,7 @@ async def ca_details(ca: str, user=Depends(get_current_user)):
             "parents":   parents,
             "resources": resources,
             "repo":      repo,
+            "_debug_parents_raw_type": str(type(raw_parents).__name__),
         }
     except Exception as e:
         return {"handle": ca, "parents": [], "resources": {}, "repo": {}, "error": str(e)}
