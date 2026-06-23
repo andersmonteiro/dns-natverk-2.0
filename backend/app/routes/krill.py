@@ -167,6 +167,73 @@ async def repo_request(ca: str, user=Depends(get_current_user)):
     return {"xml": ""}
 
 
+def _apply_lex(target: dict, lex) -> None:
+    """Extrai last_exchange e last_ok de vários formatos possíveis do Krill."""
+    if not lex:
+        return
+    if isinstance(lex, dict):
+        ts     = (lex.get("timestamp") or lex.get("at") or lex.get("time")
+                  or lex.get("unix_seconds") or "")
+        result = str(lex.get("result") or lex.get("status") or "")
+        target["last_exchange"] = str(ts)
+        target["last_ok"]       = (not result) or ("success" in result.lower()) or (result == "0")
+    elif isinstance(lex, str):
+        target["last_exchange"] = lex
+        target["last_ok"]       = True
+
+
+def _extract_uri(obj) -> str:
+    """Extrai URI de serviço de qualquer estrutura aninhada do Krill v0.16."""
+    if not obj:
+        return ""
+    if isinstance(obj, str):
+        return obj
+    if isinstance(obj, dict):
+        # Krill v0.16: {"tag": "ParentCaContact", "value": {"service_uri": "..."}}
+        val = obj.get("value")
+        if isinstance(val, dict):
+            for k in ("service_uri", "uri", "url"):
+                if val.get(k):
+                    return str(val[k])
+        # Direct fields
+        for k in ("service_uri", "uri", "url"):
+            if obj.get(k):
+                return str(obj[k])
+        # Recurse into "contact" sub-key
+        if obj.get("contact"):
+            return _extract_uri(obj["contact"])
+    return ""
+
+
+def _extract_lex(obj) -> tuple:
+    """Retorna (timestamp_str, last_ok) de vários formatos de last_exchange do Krill."""
+    if not obj:
+        return ("", None)
+    if isinstance(obj, str):
+        return (obj, True)
+    if isinstance(obj, dict):
+        # Krill v0.16: {"result": "Success", "time": 1234567890}
+        # ou {"timestamp": ..., "result": ...}
+        ts = (obj.get("time") or obj.get("timestamp") or obj.get("at")
+              or obj.get("unix_seconds") or "")
+        result = str(obj.get("result") or obj.get("status") or "")
+        ok = (not result) or result.lower() in ("success", "ok", "0", "true")
+        return (str(ts), ok)
+    return ("", None)
+
+
+@router.get("/cas/{ca}/raw-debug")
+async def ca_raw_debug(ca: str, user=Depends(get_current_user)):
+    """Dump bruto do Krill para debug — retorna os endpoints usados pelo /details."""
+    out: dict = {}
+    for path in (f"/cas/{ca}", f"/cas/{ca}/parents", f"/cas/{ca}/repo"):
+        try:
+            out[path] = await _get(path)
+        except Exception as e:
+            out[path] = {"error": str(e)}
+    return out
+
+
 @router.get("/cas/{ca}/details")
 async def ca_details(ca: str, user=Depends(get_current_user)):
     """Detalhes da CA (parents, recursos, repo) como primitivos — sem objetos aninhados."""
@@ -175,35 +242,52 @@ async def ca_details(ca: str, user=Depends(get_current_user)):
 
         # ── parents ──────────────────────────────────────────────────────────
         raw_parents = detail.get("parents") or {}
-        parents = []
+        parents: list = []
         if isinstance(raw_parents, dict):
             for handle, info in raw_parents.items():
-                p: dict = {"handle": str(handle), "contact": ""}
-                if isinstance(info, dict):
-                    contact = (info.get("contact") or info.get("service_uri")
-                               or info.get("uri") or "")
-                    if isinstance(contact, dict):
-                        contact = contact.get("uri") or contact.get("url") or ""
-                    p["contact"] = str(contact) if contact else ""
-                elif isinstance(info, str):
-                    p["contact"] = info
+                p: dict = {"handle": str(handle), "contact": "", "last_exchange": "", "last_ok": None}
+                p["contact"] = _extract_uri(info)
                 parents.append(p)
 
-        # Try /parents endpoint for last_exchange
+        # Enriquece com /parents (last_exchange e contact mais rico)
         try:
             pd = await _get(f"/cas/{ca}/parents")
             if isinstance(pd, dict):
                 for p in parents:
                     entry = pd.get(p["handle"]) or {}
                     if isinstance(entry, dict):
-                        lex = entry.get("last_exchange") or entry.get("last_response")
-                        if isinstance(lex, dict):
-                            p["last_exchange"] = str(lex.get("timestamp") or lex.get("at") or "")
-                            p["last_result"]   = str(lex.get("result", ""))
-                        elif isinstance(lex, str):
-                            p["last_exchange"] = lex
+                        # Tenta vários campos de last_exchange
+                        lex_raw = (entry.get("last_exchange") or entry.get("last_response")
+                                   or entry.get("last_cms_msg") or entry.get("last_ok"))
+                        if lex_raw is not None:
+                            ts, ok = _extract_lex(lex_raw)
+                            p["last_exchange"] = ts
+                            p["last_ok"]       = ok
+                        # contact mais rico
+                        c = _extract_uri(entry)
+                        if c and not p["contact"]:
+                            p["contact"] = c
         except Exception:
             pass
+
+        # Tenta /parents/{handle} individualmente caso /parents não trouxe last_exchange
+        for p in parents:
+            if p.get("last_exchange"):
+                continue
+            try:
+                ep = await _get(f"/cas/{ca}/parents/{p['handle']}")
+                if isinstance(ep, dict):
+                    lex_raw = (ep.get("last_exchange") or ep.get("last_response")
+                               or ep.get("last_cms_msg"))
+                    if lex_raw is not None:
+                        ts, ok = _extract_lex(lex_raw)
+                        p["last_exchange"] = ts
+                        p["last_ok"]       = ok
+                    c = _extract_uri(ep)
+                    if c and not p["contact"]:
+                        p["contact"] = c
+            except Exception:
+                pass
 
         # ── resources ────────────────────────────────────────────────────────
         raw_res = detail.get("resources") or {}
@@ -223,19 +307,25 @@ async def ca_details(ca: str, user=Depends(get_current_user)):
             for k, v in raw_repo.items():
                 if isinstance(v, (str, int)) and v:
                     repo[str(k)] = str(v)
-        # Enrich with /repo endpoint (contact URI + last_exchange)
+        # Enrich with /repo endpoint
         try:
             rd = await _get(f"/cas/{ca}/repo")
             if isinstance(rd, dict):
-                contact = rd.get("contact") or rd
-                if isinstance(contact, dict):
-                    for k, v in contact.items():
+                # contact sub-object
+                contact_obj = rd.get("contact") or rd
+                if isinstance(contact_obj, dict):
+                    for k, v in contact_obj.items():
                         if isinstance(v, (str, int)) and v and str(k) not in repo:
                             repo[str(k)] = str(v)
-                lex = rd.get("last_exchange")
-                if isinstance(lex, dict):
-                    repo["last_exchange"] = str(lex.get("timestamp") or lex.get("at") or "")
-                    repo["last_result"]   = str(lex.get("result", ""))
+                # last_exchange — Krill v0.16 pode ter vários formatos
+                for lex_key in ("last_exchange", "last_cms_msg", "last_response"):
+                    lex_raw = rd.get(lex_key)
+                    if lex_raw is not None:
+                        ts, ok = _extract_lex(lex_raw)
+                        if ts:
+                            repo["last_exchange"] = ts
+                            repo["last_ok"]       = ok
+                        break
         except Exception:
             pass
 
