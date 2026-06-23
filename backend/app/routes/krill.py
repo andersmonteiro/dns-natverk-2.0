@@ -70,8 +70,24 @@ async def krill_status(user=Depends(get_current_user)):
             r = await c.get(f"{KRILL}/api/v1/authorized", headers=HDRS)
             if not r.is_success:
                 return {"online": False, "error": f"HTTP {r.status_code}", "cas": []}
-        cas = await _get("/cas")
-        return {"online": True, "info": {"version": "krill"}, "cas": cas.get("cas", [])}
+        cas_list = await _get("/cas")
+        handles = cas_list.get("cas", [])
+        cas = []
+        for h in handles:
+            try:
+                detail = await _get(f"/cas/{h}")
+                parents = list(detail.get("parents", {}).keys())
+                repo_info = detail.get("repo_info")
+                resources = detail.get("resources", {})
+                cas.append({
+                    "handle": h,
+                    "parents": parents,
+                    "repo_info": repo_info,
+                    "resources": resources,
+                })
+            except Exception:
+                cas.append({"handle": h, "parents": [], "repo_info": None, "resources": {}})
+        return {"online": True, "info": {"version": "krill"}, "cas": cas}
     except Exception as e:
         return {"online": False, "error": str(e), "cas": []}
 
@@ -138,7 +154,10 @@ async def configure_repo(ca: str, data: ConfigureRepo, user=Depends(require_admi
 
 @router.get("/cas/{ca}/roas")
 async def list_roas(ca: str, user=Depends(get_current_user)):
-    return await _get(f"/cas/{ca}/routes")
+    data = await _get(f"/cas/{ca}/routes")
+    # Krill v0.16 returns {"authorized": [...]}
+    roas = data.get("authorized") or data.get("roas") or (data if isinstance(data, list) else [])
+    return {"roas": roas}
 
 
 class ROA(BaseModel):
