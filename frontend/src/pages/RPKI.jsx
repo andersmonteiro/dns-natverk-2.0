@@ -468,11 +468,12 @@ function ConfigSection({ cas, onCaCreated }) {
             )}
           </div>
 
-          {/* Publisher Request — só mostra se o repositório ainda não foi configurado */}
-          {hasParent && !hasRepo && (
+          {/* Publisher Request — sempre visível quando parent configurado (para referência) */}
+          {hasParent && (
             <div>
-              <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+              <h3 style={{ fontSize: 12, fontWeight: 700, color: hasRepo ? 'var(--green)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
                 4 · Publisher Request XML → registro.br
+                {hasRepo && <span style={{ marginLeft: 8 }}><CheckCircle size={12} /></span>}
               </h3>
               <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
                 Copie o XML abaixo e cole no portal do registro.br como "Publisher Request".
