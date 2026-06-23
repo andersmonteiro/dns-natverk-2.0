@@ -7,6 +7,7 @@ import {
 import { useState } from 'react'
 import { clearToken } from '../api'
 import { useTheme } from '../context/ThemeContext'
+import { useIsAdmin } from '../context/UserContext'
 import Clock from './Clock'
 
 // ── grupos da sidebar ──────────────────────────────────────────────────────────
@@ -93,6 +94,7 @@ function NavGroup({ label, icon: Icon, items, defaultOpen = true }) {
 export default function Layout() {
   const navigate = useNavigate()
   const { theme, toggle } = useTheme()
+  const isAdmin = useIsAdmin()
 
   function logout() {
     clearToken()
@@ -122,7 +124,7 @@ export default function Layout() {
           <NavGroup label="DNS" icon={Wifi} items={DNS_ITEMS} defaultOpen={true} />
           <NavGroup label="RPKI" icon={Globe} items={RPKI_ITEMS} defaultOpen={true} />
           <NavGroup label="Sistema" icon={Wrench} items={SISTEMA_ITEMS} defaultOpen={true} />
-          <NavGroup label="Admin" icon={Users} items={ADMIN_ITEMS} defaultOpen={true} />
+          {isAdmin && <NavGroup label="Admin" icon={Users} items={ADMIN_ITEMS} defaultOpen={true} />}
         </nav>
 
         {/* Footer */}

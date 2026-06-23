@@ -24,7 +24,7 @@ async def list_whitelist(user=Depends(get_current_user)):
 
 
 @router.post("/")
-async def add_whitelist(data: DomainIn, user=Depends(get_current_user)):
+async def add_whitelist(data: DomainIn, user=Depends(require_admin)):
     domain = data.domain.strip().lower()
     if not domain:
         raise HTTPException(400, "Domínio inválido")
@@ -45,7 +45,7 @@ async def add_whitelist(data: DomainIn, user=Depends(get_current_user)):
 
 
 @router.delete("/{domain}")
-async def remove_whitelist(domain: str, user=Depends(get_current_user)):
+async def remove_whitelist(domain: str, user=Depends(require_admin)):
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute("DELETE FROM whitelist_domain WHERE domain = ?", (domain,))
         await db.execute(

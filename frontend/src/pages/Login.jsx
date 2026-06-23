@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, setToken } from '../api'
+import { useUser } from '../context/UserContext'
 
 export default function Login() {
   const [user, setUser] = useState('')
@@ -8,6 +9,7 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const { setUser: setCtxUser } = useUser() || {}
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -16,6 +18,9 @@ export default function Login() {
     try {
       const data = await api.login(user, pass)
       setToken(data.access_token)
+      // Atualiza contexto de usuário para que o Layout reflita o role imediatamente
+      const me = await api.me()
+      if (setCtxUser) setCtxUser(me)
       navigate('/dashboard')
     } catch (err) {
       setError(err.message)

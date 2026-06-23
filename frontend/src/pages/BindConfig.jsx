@@ -5,6 +5,7 @@ import {
   ArrowLeft, Loader, Shield, Lock,
 } from 'lucide-react'
 import { api } from '../api'
+import { useIsAdmin } from '../context/UserContext'
 
 // ── estilos base ──────────────────────────────────────────────────────────────
 
@@ -753,6 +754,8 @@ const TABS = [
 
 export default function BindConfig() {
   const [tab, setTab] = useState('acl')
+  const isAdmin = useIsAdmin()
+  const visibleTabs = isAdmin ? TABS : TABS.filter(t => t.id !== 'avancado')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -768,7 +771,7 @@ export default function BindConfig() {
         borderRadius: 'var(--r-md)',
         overflow: 'hidden',
       }}>
-        {TABS.map(({ id, label, icon: Icon }) => (
+        {visibleTabs.map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setTab(id)} style={{
             flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
             padding: '11px 16px', border: 'none', cursor: 'pointer', fontSize: 13,

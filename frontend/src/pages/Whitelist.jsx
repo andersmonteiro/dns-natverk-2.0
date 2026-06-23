@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { ShieldCheck, Plus, Trash2, Loader } from 'lucide-react'
 import { api } from '../api'
 import Panel from '../components/Panel'
+import { useIsAdmin } from '../context/UserContext'
 
 export default function Whitelist() {
   const [items, setItems] = useState([])
@@ -10,11 +11,12 @@ export default function Whitelist() {
   const [reason, setReason] = useState('')
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState('')
+  const isAdmin = useIsAdmin()
 
   async function load() {
     try {
       const data = await api.listWhitelist()
-      setItems(data.items || [])
+      setItems(Array.isArray(data) ? data : (data.items || []))
     } catch (e) {
       setError(e.message)
     } finally {
@@ -66,34 +68,37 @@ export default function Whitelist() {
         <ShieldCheck size={20} color="var(--green)" /> Whitelist de Domínios
       </h1>
 
-      <Panel title="Adicionar domínio" subtitle="Domínios na whitelist não são bloqueados">
-        <form onSubmit={add} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <input
-            value={domain}
-            onChange={e => setDomain(e.target.value)}
-            placeholder="exemplo.com.br"
-            style={{ ...inputStyle, flex: '1 1 180px', minWidth: 180 }}
-          />
-          <input
-            value={reason}
-            onChange={e => setReason(e.target.value)}
-            placeholder="Motivo (opcional)"
-            style={{ ...inputStyle, flex: '2 1 250px' }}
-          />
-          <button type="submit" disabled={adding} style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '8px 16px',
-            background: 'var(--green)',
-            border: 'none', borderRadius: 'var(--r-sm)',
-            color: '#fff', fontSize: 13, fontWeight: 600,
-            cursor: adding ? 'not-allowed' : 'pointer',
-          }}>
-            {adding ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={14} />}
-            Adicionar
-          </button>
-        </form>
-        {error && <div style={{ marginTop: 8, color: 'var(--red)', fontSize: 12 }}>{error}</div>}
-      </Panel>
+      {/* Adicionar — só admin */}
+      {isAdmin && (
+        <Panel title="Adicionar domínio" subtitle="Domínios na whitelist não são bloqueados">
+          <form onSubmit={add} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input
+              value={domain}
+              onChange={e => setDomain(e.target.value)}
+              placeholder="exemplo.com.br"
+              style={{ ...inputStyle, flex: '1 1 180px', minWidth: 180 }}
+            />
+            <input
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              placeholder="Motivo (opcional)"
+              style={{ ...inputStyle, flex: '2 1 250px' }}
+            />
+            <button type="submit" disabled={adding} style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px',
+              background: 'var(--green)',
+              border: 'none', borderRadius: 'var(--r-sm)',
+              color: '#fff', fontSize: 13, fontWeight: 600,
+              cursor: adding ? 'not-allowed' : 'pointer',
+            }}>
+              {adding ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={14} />}
+              Adicionar
+            </button>
+          </form>
+          {error && <div style={{ marginTop: 8, color: 'var(--red)', fontSize: 12 }}>{error}</div>}
+        </Panel>
+      )}
 
       <Panel title="Domínios liberados" subtitle={`${items.length} entradas`}>
         {loading ? (
@@ -104,7 +109,7 @@ export default function Whitelist() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['Domínio', 'Motivo', 'Adicionado por', 'Data', ''].map(h => (
+                {['Domínio', 'Motivo', 'Adicionado por', 'Data', isAdmin ? '' : null].filter(Boolean).map(h => (
                   <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--text-muted)', fontWeight: 600, fontSize: 11 }}>{h}</th>
                 ))}
               </tr>
@@ -121,16 +126,18 @@ export default function Whitelist() {
                   <td style={{ padding: '9px 10px', color: 'var(--text-muted)' }}>
                     {item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : '—'}
                   </td>
-                  <td style={{ padding: '9px 10px', textAlign: 'right' }}>
-                    <button onClick={() => remove(item.domain)} style={{
-                      background: 'transparent', border: '1px solid var(--red-dim)',
-                      borderRadius: 'var(--r-sm)', color: 'var(--red)',
-                      padding: '4px 8px', cursor: 'pointer', fontSize: 11,
-                      display: 'inline-flex', alignItems: 'center', gap: 4,
-                    }}>
-                      <Trash2 size={12} /> Remover
-                    </button>
-                  </td>
+                  {isAdmin && (
+                    <td style={{ padding: '9px 10px', textAlign: 'right' }}>
+                      <button onClick={() => remove(item.domain)} style={{
+                        background: 'transparent', border: '1px solid var(--red-dim)',
+                        borderRadius: 'var(--r-sm)', color: 'var(--red)',
+                        padding: '4px 8px', cursor: 'pointer', fontSize: 11,
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                      }}>
+                        <Trash2 size={12} /> Remover
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Trash2, ShieldOff } from 'lucide-react'
 import { api } from '../api'
 import Panel from '../components/Panel'
+import { useIsAdmin } from '../context/UserContext'
 
 export default function Blocklist() {
   const [blocks, setBlocks] = useState([])
@@ -9,6 +10,7 @@ export default function Blocklist() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
+  const isAdmin = useIsAdmin()
 
   async function load() {
     try { setBlocks(await api.listBlocks()) } catch {}
@@ -51,34 +53,36 @@ export default function Blocklist() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <h1 style={{ fontSize: 20, fontWeight: 700 }}>Lista de Bloqueios</h1>
 
-      {/* Adicionar */}
-      <Panel title="Bloquear domínio">
-        <form onSubmit={add} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 240 }}>
-            <input
-              type="text"
-              value={newDomain}
-              onChange={e => setNewDomain(e.target.value)}
-              placeholder="ex: ads.example.com"
-              style={{ ...inputStyle, width: '100%' }}
-            />
-          </div>
-          <button type="submit" disabled={loading} style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '8px 16px',
-            background: 'var(--red)',
-            border: 'none',
-            borderRadius: 'var(--r-md)',
-            color: '#fff',
-            fontSize: 13, fontWeight: 600,
-            cursor: loading ? 'not-allowed' : 'pointer',
-          }}>
-            <Plus size={15} />
-            Bloquear
-          </button>
-        </form>
-        {error && <div style={{ marginTop: 10, color: 'var(--red)', fontSize: 13 }}>{error}</div>}
-      </Panel>
+      {/* Adicionar — só admin */}
+      {isAdmin && (
+        <Panel title="Bloquear domínio">
+          <form onSubmit={add} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 240 }}>
+              <input
+                type="text"
+                value={newDomain}
+                onChange={e => setNewDomain(e.target.value)}
+                placeholder="ex: ads.example.com"
+                style={{ ...inputStyle, width: '100%' }}
+              />
+            </div>
+            <button type="submit" disabled={loading} style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px',
+              background: 'var(--red)',
+              border: 'none',
+              borderRadius: 'var(--r-md)',
+              color: '#fff',
+              fontSize: 13, fontWeight: 600,
+              cursor: loading ? 'not-allowed' : 'pointer',
+            }}>
+              <Plus size={15} />
+              Bloquear
+            </button>
+          </form>
+          {error && <div style={{ marginTop: 10, color: 'var(--red)', fontSize: 13 }}>{error}</div>}
+        </Panel>
+      )}
 
       {/* Lista */}
       <Panel
@@ -102,7 +106,7 @@ export default function Blocklist() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr>
-                    {['Domínio', 'Bloqueado por', 'Data', ''].map(h => (
+                    {['Domínio', 'Bloqueado por', 'Data', isAdmin ? '' : null].filter(Boolean).map(h => (
                       <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--text-muted)', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.5px', borderBottom: '1px solid var(--border)' }}>{h}</th>
                     ))}
                   </tr>
@@ -118,20 +122,22 @@ export default function Blocklist() {
                       <td style={{ padding: '10px 10px', color: 'var(--text-muted)', fontSize: 11, whiteSpace: 'nowrap' }}>
                         {new Date(b.created_at).toLocaleString('pt-BR')}
                       </td>
-                      <td style={{ padding: '10px 10px', textAlign: 'right' }}>
-                        <button onClick={() => remove(b.domain)} style={{
-                          background: 'transparent', border: 'none',
-                          color: 'var(--text-muted)', cursor: 'pointer',
-                          padding: 4, borderRadius: 4,
-                          transition: 'color .15s',
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
-                        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-                        title="Remover bloqueio"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
+                      {isAdmin && (
+                        <td style={{ padding: '10px 10px', textAlign: 'right' }}>
+                          <button onClick={() => remove(b.domain)} style={{
+                            background: 'transparent', border: 'none',
+                            color: 'var(--text-muted)', cursor: 'pointer',
+                            padding: 4, borderRadius: 4,
+                            transition: 'color .15s',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
+                          onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                          title="Remover bloqueio"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

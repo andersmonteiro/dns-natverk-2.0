@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { ThemeProvider } from './context/ThemeContext'
 import { RefreshProvider } from './context/RefreshContext'
+import { UserProvider } from './context/UserContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -55,9 +56,11 @@ export default function App() {
   return (
     <ThemeProvider>
       <RefreshProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
+        <UserProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </UserProvider>
       </RefreshProvider>
     </ThemeProvider>
   )
