@@ -308,22 +308,24 @@ async def ca_details(ca: str, user=Depends(get_current_user)):
         except Exception:
             pass
 
-        # Tenta /parents/{handle} individualmente para last_exchange
+        # Tenta /parents/{handle} individualmente — sempre, para pegar contact
         for p in parents:
-            if p.get("last_exchange"):
-                continue
+            if p.get("last_exchange") and p.get("contact"):
+                continue  # só pula se AMBOS já estiverem preenchidos
             try:
                 ep = await _get(f"/cas/{ca}/parents/{p['handle']}")
                 if isinstance(ep, dict):
-                    for lex_key in ("last_exchange", "last_cms_msg", "last_response"):
-                        if ep.get(lex_key) is not None:
-                            ts, ok = _extract_lex(ep[lex_key])
-                            p["last_exchange"] = ts
-                            p["last_ok"]       = ok
-                            break
-                    c = _extract_uri(ep)
-                    if c and not p["contact"]:
-                        p["contact"] = c
+                    if not p.get("last_exchange"):
+                        for lex_key in ("last_exchange", "last_cms_msg", "last_response"):
+                            if ep.get(lex_key) is not None:
+                                ts, ok = _extract_lex(ep[lex_key])
+                                p["last_exchange"] = ts
+                                p["last_ok"]       = ok
+                                break
+                    if not p.get("contact"):
+                        c = _extract_uri(ep)
+                        if c:
+                            p["contact"] = c
             except Exception:
                 pass
 
@@ -363,8 +365,10 @@ async def ca_details(ca: str, user=Depends(get_current_user)):
             repo.update(_safe_repo_from(raw_repo))
 
         # Enrich with /repo endpoint
+        rd_raw: dict = {}
         try:
             rd = await _get(f"/cas/{ca}/repo")
+            rd_raw = rd if isinstance(rd, dict) else {}
             if isinstance(rd, dict):
                 repo.update(_safe_repo_from(rd))
                 # last_exchange — varre todos os níveis do dict recursivamente
@@ -404,6 +408,7 @@ async def ca_details(ca: str, user=Depends(get_current_user)):
             "parents":   parents,
             "resources": resources,
             "repo":      repo,
+            "_debug_rd": rd_raw,   # raw /repo — remover depois
         }
     except Exception as e:
         return {"handle": ca, "parents": [], "resources": {}, "repo": {}, "error": str(e)}
