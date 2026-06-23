@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from ..auth import require_admin
 from ..db import DB_PATH
+from ..domain_utils import normalizar, dominio_valido, is_tld_protegido, is_whitelisted, DOMAIN_RE
 from .blocks import rebuild_blocks_conf
 
 router = APIRouter(prefix="/api/blocks", tags=["blocks-import"])
@@ -182,11 +183,12 @@ async def import_preview(
         existing = {r[0] for r in await cur.fetchall()}
 
         cur = await db.execute("SELECT domain FROM whitelist_domain")
-        whitelisted = {r[0] for r in await cur.fetchall()}
+        whitelist = {r[0] for r in await cur.fetchall()}
 
     already_blocked = found & existing
-    wl_hit = found & whitelisted
-    new_domains = sorted(found - existing - whitelisted)
+    # Whitelist com suffix matching + TLD protection
+    wl_hit = {d for d in found if is_whitelisted(d, whitelist) or is_tld_protegido(d)}
+    new_domains = sorted(found - existing - wl_hit)
 
     return {
         "files": file_names,
@@ -210,10 +212,18 @@ async def import_apply(payload: ApplyPayload, user=Depends(require_admin)):
     inserted = 0
     skipped = 0
 
+    # Revalida whitelist no momento do apply (pode ter mudado desde o preview)
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT domain FROM whitelist_domain")
+        whitelist = {r[0] for r in await cur.fetchall()}
+
     async with aiosqlite.connect(DB_PATH) as db:
         for domain in payload.domains:
-            domain = domain.strip().lower().rstrip('.')
-            if not domain or not DOMINIO_RE.match(domain):
+            domain = normalizar(domain)
+            if not domain or not dominio_valido(domain):
+                skipped += 1
+                continue
+            if is_tld_protegido(domain) or is_whitelisted(domain, whitelist):
                 skipped += 1
                 continue
             try:

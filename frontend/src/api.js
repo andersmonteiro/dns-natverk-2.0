@@ -77,9 +77,11 @@ export const api = {
   removeBlock:  (domain) => request(`/blocks/${domain}`, { method: 'DELETE' }),
 
   // Whitelist
-  listWhitelist:  () => request('/whitelist/'),
-  addWhitelist:   (domain, reason) => request('/whitelist/', { method: 'POST', body: JSON.stringify({ domain, reason }) }),
-  removeWhitelist:(domain) => request(`/whitelist/${encodeURIComponent(domain)}`, { method: 'DELETE' }),
+  listWhitelist:    () => request('/whitelist/'),
+  addWhitelist:     (domain, reason) => request('/whitelist/', { method: 'POST', body: JSON.stringify({ domain, reason }) }),
+  removeWhitelist:  (domain) => request(`/whitelist/${encodeURIComponent(domain)}`, { method: 'DELETE' }),
+  whitelistDefaults: () => request('/whitelist/defaults'),
+  whitelistSeed:    (domains) => request('/whitelist/seed', { method: 'POST', body: JSON.stringify({ domains }) }),
 
   // Auditoria
   listAudit: (params = {}) => {

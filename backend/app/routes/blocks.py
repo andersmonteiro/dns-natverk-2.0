@@ -8,12 +8,15 @@ from pydantic import BaseModel
 from ..auth import get_current_user, require_admin
 from ..config import settings
 from ..db import DB_PATH
+from ..domain_utils import normalizar, dominio_valido, is_tld_protegido, is_whitelisted, PROTECTED_TLDS
 
 router = APIRouter(prefix="/api/blocks", tags=["blocks"])
 
-BIND_DIR    = Path(settings.bind_conf_dir)
+BIND_DIR       = Path(settings.bind_conf_dir)
 BLOQUEIOS_CONF = BIND_DIR / "named.conf.bloqueios"
-BLOQUEIO    = BIND_DIR / "db.bloqueio"
+WHITELIST_CONF = BIND_DIR / "named.conf.whitelist"
+NAMED_CONF     = BIND_DIR / "named.conf"
+BLOQUEIO       = BIND_DIR / "db.bloqueio"
 
 BLOQUEIO_CONTENT = """\
 ; Zona de bloqueio — DNS Nätverk Panel
@@ -51,21 +54,53 @@ async def _rndc_reconfig() -> None:
 
 
 async def rebuild_blocks_conf() -> None:
-    """Regenera named.conf.bloqueios a partir do banco de dados e recarrega o BIND."""
+    """Regenera named.conf.bloqueios e named.conf.whitelist, recarrega o BIND."""
     # Garante que db.bloqueio existe
     if not BLOQUEIO.exists():
         BLOQUEIO.write_text(BLOQUEIO_CONTENT)
 
     async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute("SELECT domain FROM blocked_domain ORDER BY domain")
-        domains = [row[0] for row in await cursor.fetchall()]
+        cur = await db.execute("SELECT domain FROM whitelist_domain")
+        whitelist = {r[0] for r in await cur.fetchall()}
 
+        cursor = await db.execute("SELECT domain FROM blocked_domain ORDER BY domain")
+        all_blocked = [row[0] for row in await cursor.fetchall()]
+
+    # ── named.conf.whitelist — forward zones para domínios protegidos ─────────
+    # Exclui TLDs bare (com, net, com.br etc.) — não faz sentido como forward zone
+    wl_domains = sorted(d for d in whitelist if d not in PROTECTED_TLDS)
+    wl_lines = [
+        f'zone "{d}" {{ type forward; forwarders {{ 8.8.8.8; 1.1.1.1; }}; forward only; }};\n'
+        for d in wl_domains
+    ]
+    WHITELIST_CONF.write_text(
+        "// Whitelist — DNS Nätverk Panel — sempre encaminhado ao upstream\n"
+        + "".join(wl_lines)
+    )
+
+    # Garante que named.conf inclui o whitelist ANTES dos bloqueios (servidores existentes)
+    if NAMED_CONF.exists():
+        nc = NAMED_CONF.read_text()
+        if 'named.conf.whitelist' not in nc:
+            nc = nc.replace(
+                'include "/etc/bind/named.conf.bloqueios";',
+                'include "/etc/bind/named.conf.whitelist";\ninclude "/etc/bind/named.conf.bloqueios";'
+            )
+            NAMED_CONF.write_text(nc)
+
+    # ── named.conf.bloqueios — exclui domínios protegidos ────────────────────
+    block_domains = [
+        d for d in all_blocked
+        if not is_tld_protegido(d) and not is_whitelisted(d, whitelist)
+    ]
     lines = [
         f'zone "{d}" {{ type master; file "/etc/bind/db.bloqueio"; }};\n'
-        for d in domains
+        for d in block_domains
     ]
-    header = "// Gerenciado automaticamente pelo DNS Natverk Panel\n"
-    BLOQUEIOS_CONF.write_text(header + "".join(lines))
+    BLOQUEIOS_CONF.write_text(
+        "// Gerenciado automaticamente pelo DNS Natverk Panel\n"
+        + "".join(lines)
+    )
 
     await _rndc_reconfig()
 
@@ -87,13 +122,25 @@ async def list_blocked(user=Depends(get_current_user)):
 
 @router.post("/")
 async def add_block(data: DomainIn, user=Depends(require_admin)):
-    domain = data.domain.strip().lower().rstrip(".")
-    if not domain:
-        raise HTTPException(400, "Domínio inválido")
+    domain = normalizar(data.domain)
+    if not domain or not dominio_valido(domain):
+        raise HTTPException(400, "Domínio inválido — verifique a sintaxe")
+
+    if is_tld_protegido(domain):
+        raise HTTPException(400, f"'{domain}' é um TLD protegido e não pode ser bloqueado (causaria interrupção em massa)")
+
+    # Verifica whitelist (com sufixo matching)
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT domain FROM whitelist_domain")
+        whitelist = {r[0] for r in await cur.fetchall()}
+
+    if is_whitelisted(domain, whitelist):
+        raise HTTPException(409, f"'{domain}' está protegido pela whitelist e não pode ser bloqueado")
+
     async with aiosqlite.connect(DB_PATH) as db:
         try:
             await db.execute(
-                "INSERT INTO blocked_domain (domain, created_by) VALUES (?, ?)",
+                "INSERT INTO blocked_domain (domain, created_by, source) VALUES (?, ?, 'manual')",
                 (domain, user["username"])
             )
             await db.execute(

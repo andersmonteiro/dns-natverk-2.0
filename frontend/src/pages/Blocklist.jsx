@@ -351,7 +351,7 @@ export default function Blocklist() {
           onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)' }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}
           >
-            <Upload size={14} /> Importar lote
+            <Upload size={14} /> Importar
           </button>
         )}
       </div>
