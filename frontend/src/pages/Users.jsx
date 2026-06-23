@@ -37,7 +37,7 @@ export default function Users() {
   async function load() {
     try {
       const data = await api.listUsers()
-      setUsers(data.items || [])
+      setUsers(Array.isArray(data) ? data : (data.items || []))
     } catch (e) {
       setError(e.message)
     } finally {
