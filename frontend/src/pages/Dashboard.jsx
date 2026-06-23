@@ -34,13 +34,21 @@ function fmtUptime(secs) {
 
 const PIE_COLORS = ['#3b82f6','#22c55e','#eab308','#ef4444','#a855f7','#06b6d4','#f97316']
 
+const ttStyle = {
+  background: 'var(--bg-tooltip, #1e2433)',
+  border: '1px solid var(--border)',
+  borderRadius: 6, padding: '8px 12px', fontSize: 12,
+  color: 'var(--text-primary)',
+  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+}
+
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
   return (
-    <div style={{ background: 'var(--bg-panel-2)', border: '1px solid var(--border-2)', borderRadius: 6, padding: '8px 12px', fontSize: 12 }}>
+    <div style={ttStyle}>
       <div style={{ color: 'var(--text-muted)', marginBottom: 4 }}>{label}</div>
       {payload.map(p => (
-        <div key={p.name} style={{ color: p.color || 'var(--text-primary)' }}>
+        <div key={p.name} style={{ color: p.color || 'var(--accent)' }}>
           {fmt(p.value)} queries
         </div>
       ))}
@@ -211,7 +219,7 @@ export default function Dashboard() {
                   />
                   <Tooltip
                     formatter={(v) => [fmt(v), 'queries']}
-                    contentStyle={{ background: 'var(--bg-panel-2)', border: '1px solid var(--border-2)', borderRadius: 6, fontSize: 12 }}
+                    contentStyle={ttStyle}
                   />
                 </PieChart>
               </ResponsiveContainer>

@@ -53,8 +53,10 @@ function sortTypes(types) {
 }
 
 const tooltipStyle = {
-  background: 'var(--bg-panel-2)', border: '1px solid var(--border-2)',
+  background: 'var(--bg-tooltip, #1e2433)', border: '1px solid var(--border)',
   borderRadius: 6, fontSize: 12,
+  color: 'var(--text-primary)',
+  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
 }
 
 // ── componente principal ───────────────────────────────────────────────────────
