@@ -93,10 +93,17 @@ async def krill_status(user=Depends(get_current_user)):
                     parent = p.get("handle") if isinstance(p, dict) else str(p)
                 else:
                     parent = None
-                has_repo = bool(detail.get("repo_info"))
-                cas.append({"handle": h, "parent": parent, "has_repo": has_repo})
+                # Extract repo_info as flat string dict (no nested objects)
+                raw_repo = detail.get("repo_info") or {}
+                repo_data: dict = {}
+                if isinstance(raw_repo, dict):
+                    for k, v in raw_repo.items():
+                        if isinstance(v, (str, int, float)) and v not in ("", None):
+                            repo_data[str(k)] = str(v)
+                has_repo = bool(repo_data)
+                cas.append({"handle": h, "parent": parent, "has_repo": has_repo, "repo_data": repo_data})
             except Exception:
-                cas.append({"handle": h, "parent": None, "has_repo": False})
+                cas.append({"handle": h, "parent": None, "has_repo": False, "repo_data": {}})
         return {"online": True, "info": {"version": "krill"}, "cas": cas}
     except Exception as e:
         return {"online": False, "error": str(e), "cas": []}

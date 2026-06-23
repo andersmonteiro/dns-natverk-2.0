@@ -69,16 +69,18 @@ const textarea = {
   lineHeight: 1.5, minHeight: 120,
 }
 
-function StatusBadge({ ok, msg }) {
+function StatusBadge({ ok, warn, msg }) {
+  const color = ok ? 'var(--green)' : warn ? 'var(--orange, #f59e0b)' : 'var(--red)'
+  const bg    = ok ? 'rgba(34,197,94,.12)' : warn ? 'rgba(245,158,11,.10)' : 'rgba(239,68,68,.12)'
   return (
     <div style={{
       marginTop: 10, padding: '8px 12px', borderRadius: 'var(--r-sm)',
-      background: ok ? 'var(--green-dim, rgba(34,197,94,.12))' : 'rgba(239,68,68,.12)',
-      border: `1px solid ${ok ? 'var(--green)' : 'var(--red)'}`,
-      color: ok ? 'var(--green)' : 'var(--red)',
+      background: bg, border: `1px solid ${color}`, color,
       fontSize: 12, whiteSpace: 'pre-wrap',
     }}>
-      {ok ? <CheckCircle size={13} style={{ marginRight: 6 }} /> : <XCircle size={13} style={{ marginRight: 6 }} />}
+      {ok   ? <CheckCircle size={13} style={{ marginRight: 6 }} />
+            : warn ? <AlertCircle size={13} style={{ marginRight: 6 }} />
+                   : <XCircle size={13} style={{ marginRight: 6 }} />}
       {String(msg)}
     </div>
   )
@@ -135,31 +137,25 @@ function FileUploadButton({ onLoad, label = 'Carregar arquivo .xml' }) {
   )
 }
 
-function RepoContactDisplay({ ca }) {
-  const [contact, setContact] = useState(null)
-  const [loading, setLoading] = useState(true)
+// repo_data comes from status.cas[x].repo_data — flat string dict, no API call needed
+function RepoContactDisplay({ repoData }) {
+  if (!repoData || typeof repoData !== 'object') return null
 
-  useEffect(() => {
-    if (!ca) return
-    api.krillRepoContact(ca)
-      .then(r => setContact(r))
-      .catch(() => setContact(null))
-      .finally(() => setLoading(false))
-  }, [ca])
+  // Friendly labels for known Krill field names
+  const LABELS = {
+    base_uri:                'SIA Base (rsync)',
+    rpki_notify:             'RRDP Notification URI',
+    sia_base:                'SIA Base (rsync)',
+    rrdp_notification_uri:   'RRDP Notification URI',
+    service_uri:             'Service URI',
+    publisher_handle:        'Publisher Handle',
+  }
 
-  if (loading) return <div style={{ color: 'var(--text-muted)', fontSize: 12 }}><Loader size={12} /> Carregando...</div>
-  if (!contact || contact.error) return null
+  const rows = Object.entries(repoData)
+    .filter(([, v]) => v)
+    .map(([k, v]) => [LABELS[k] || k, String(v)])
 
-  // Krill returns {type, contact: {...}} or the object directly
-  const info = contact.contact || contact
-  const fields = [
-    ['Publisher Handle', info.publisher_handle],
-    ['Service URI',      info.service_uri],
-    ['SIA Base (rsync)', info.sia_base],
-    ['RRDP Notification', info.rrdp_notification_uri],
-  ].filter(([, v]) => v)
-
-  if (!fields.length) return null
+  if (!rows.length) return null
 
   return (
     <div style={{
@@ -172,7 +168,7 @@ function RepoContactDisplay({ ca }) {
       </div>
       <table style={{ borderCollapse: 'collapse', width: '100%' }}>
         <tbody>
-          {fields.map(([label, value]) => (
+          {rows.map(([label, value]) => (
             <tr key={label}>
               <td style={{ padding: '3px 10px 3px 0', color: 'var(--text-muted)', whiteSpace: 'nowrap', verticalAlign: 'top' }}>{label}</td>
               <td style={{ padding: '3px 0', fontFamily: 'monospace', wordBreak: 'break-all', color: 'var(--text-primary)' }}>
@@ -498,7 +494,7 @@ function ConfigSection({ cas, onCaCreated }) {
                     <CheckCircle size={13} style={{ marginRight: 6 }} />
                     Repositório configurado. Krill pronto para emitir ROAs.
                   </div>
-                  <RepoContactDisplay ca={selectedCa} />
+                  <RepoContactDisplay repoData={caInfo?.repo_data} />
                 </div>
               ) : (
                 <>
@@ -674,7 +670,13 @@ function BGPSection({ ca }) {
     try {
       const r = await api.krillBgp(ca)
       setData(r)
-      if (r?.error) setStatusMsg({ ok: false, msg: `BGP não disponível: ${r.error}` })
+      if (r?.error) {
+        // 404 = endpoint não disponível nesta versão do Krill — aviso sutil, não erro
+        const is404 = String(r.error).includes('404')
+        setStatusMsg({ ok: false, warn: is404, msg: is404
+          ? 'Análise BGP não disponível nesta versão do Krill.'
+          : `BGP: ${r.error}` })
+      }
     } catch (e) {
       setStatusMsg({ ok: false, msg: String(e.message) })
     } finally { setLoading(false) }
