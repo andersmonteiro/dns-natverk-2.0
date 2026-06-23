@@ -270,18 +270,18 @@ function CaDetailsPanel({ ca, section }) {
                             <CopyVal value={res.asn} />
                           </div>
                         )}
-                        {res.ipv4?.map(ip => (
-                          <div key={ip} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {res.ipv4?.length > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                             <span style={{ color: 'var(--text-muted)', fontSize: 11, minWidth: 34 }}>IPv4</span>
-                            <CopyVal value={ip} />
+                            {res.ipv4.map(ip => <CopyVal key={ip} value={ip} />)}
                           </div>
-                        ))}
-                        {res.ipv6?.map(ip => (
-                          <div key={ip} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        )}
+                        {res.ipv6?.length > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                             <span style={{ color: 'var(--text-muted)', fontSize: 11, minWidth: 34 }}>IPv6</span>
-                            <CopyVal value={ip} />
+                            {res.ipv6.map(ip => <CopyVal key={ip} value={ip} />)}
                           </div>
-                        ))}
+                        )}
                       </div>
                     </KrillTableRow>
                   )}
@@ -319,9 +319,11 @@ function CaDetailsPanel({ ca, section }) {
                     <CopyVal value={value} />
                   </KrillTableRow>
                 ))}
-                <KrillTableRow label="Last Exchange">
-                  <ExchangeCell ts={repo.last_exchange} ok={repo.last_ok} />
-                </KrillTableRow>
+                {repo.last_exchange && (
+                  <KrillTableRow label="Last Exchange">
+                    <ExchangeCell ts={repo.last_exchange} ok={repo.last_ok} />
+                  </KrillTableRow>
+                )}
               </tbody>
             </table>
           </div>
