@@ -12,7 +12,7 @@ export function UserProvider({ children }) {
     if (!token) { setLoading(false); return }
     api.me()
       .then(data => setUser(data))
-      .catch(() => setUser(null))
+      .catch(e => { console.warn('[UserContext] api.me() falhou:', e); setUser(null) })
       .finally(() => setLoading(false))
   }, [])
 
@@ -28,6 +28,8 @@ export function useUser() {
 }
 
 export function useIsAdmin() {
-  const { user } = useContext(UserContext) || {}
-  return user?.role === 'admin'
+  const ctx = useContext(UserContext) || {}
+  // Enquanto carrega, não restringe nada — o backend é quem enforça permissões
+  if (ctx.loading !== false) return true
+  return ctx.user?.role === 'admin'
 }
