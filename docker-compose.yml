@@ -18,6 +18,7 @@ services:
     restart: unless-stopped
     environment:
       - KRILL_AUTH_TOKEN=${KRILL_AUTH_TOKEN:-change-me-krill-token}
+      - KRILL_ADMIN_TOKEN=${KRILL_AUTH_TOKEN:-change-me-krill-token}
       - KRILL_FQDN=${KRILL_FQDN:-localhost}
       - TZ=${TZ:-America/Sao_Paulo}
     volumes:
