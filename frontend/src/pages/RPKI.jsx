@@ -781,13 +781,17 @@ function ROASection({ ca }) {
 // ── Seção: BGP Analysis (via RIPE RPKI Validator) ────────────────────────────
 
 function RpkiBadge({ state }) {
+  // Normaliza: "valid" → "Valid", "not_found"/"NotFound" → "NotFound"
+  const norm = state
+    ? state.replace(/_/g, '').replace(/\b\w/g, c => c.toUpperCase()).replace('Notfound', 'NotFound')
+    : 'NotFound'
   const cfg = {
-    Valid:    { bg: '#1a3a1a', border: '#2d6a2d', text: '#4caf50', label: 'VALID' },
-    Invalid:  { bg: '#3a1a1a', border: '#6a2d2d', text: '#f44336', label: 'INVALID' },
-    NotFound: { bg: '#2a2a1a', border: '#5a5a1a', text: '#ff9800', label: 'NOT FOUND' },
-    Error:    { bg: '#3a1a1a', border: '#6a2d2d', text: '#f44336', label: 'ERROR' },
+    Valid:    { bg: '#0d2b0d', border: '#1e5c1e', text: '#4caf50', label: 'VALID' },
+    Invalid:  { bg: '#2b0d0d', border: '#5c1e1e', text: '#ef5350', label: 'INVALID' },
+    NotFound: { bg: '#2b2400', border: '#5c4d00', text: '#ff9800', label: 'NOT FOUND' },
+    Error:    { bg: '#2b0d0d', border: '#5c1e1e', text: '#ef5350', label: 'ERROR' },
   }
-  const c = cfg[state] || { bg: 'var(--bg-panel)', border: 'var(--border)', text: 'var(--text-muted)', label: state }
+  const c = cfg[norm] || { bg: 'var(--bg-panel)', border: 'var(--border)', text: 'var(--text-muted)', label: String(state).toUpperCase() }
   return (
     <span style={{
       display: 'inline-block', padding: '2px 8px', borderRadius: 3, fontSize: 11,
