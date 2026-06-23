@@ -65,11 +65,13 @@ async def _get_xml(path: str) -> str:
 @router.get("/status")
 async def krill_status(user=Depends(get_current_user)):
     try:
-        info = await _get("/info")
-        cas  = await _get("/cas")
-        return {"online": True, "info": info, "cas": cas.get("cas", [])}
-    except HTTPException:
-        raise
+        # /authorized funciona no Krill v0.16+ (retorna 200 se token válido)
+        async with httpx.AsyncClient(verify=False, timeout=10) as c:
+            r = await c.get(f"{KRILL}/api/v1/authorized", headers=HDRS)
+            if not r.is_success:
+                return {"online": False, "error": f"HTTP {r.status_code}", "cas": []}
+        cas = await _get("/cas")
+        return {"online": True, "info": {"version": "krill"}, "cas": cas.get("cas", [])}
     except Exception as e:
         return {"online": False, "error": str(e), "cas": []}
 
