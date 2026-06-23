@@ -517,53 +517,16 @@ function ConfigSection({ cas, onCaCreated }) {
             <XmlDisplay xml={childXml} loading={loadingXml} />
           </div>
 
-          {/* Parent Response */}
-          <div>
-            <h3 style={{ fontSize: 12, fontWeight: 700, color: hasParent ? 'var(--green)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
-              3 · Parent Response XML ← registro.br
-              {hasParent && <span style={{ marginLeft: 8 }}><CheckCircle size={12} /></span>}
-            </h3>
-            {hasParent ? (
-              <CaDetailsPanel ca={selectedCa} section="parents" />
-            ) : (
-              <>
-                <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                  Cole aqui o "Parent Response" XML fornecido pelo registro.br.
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div>
-                    <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Nome do Parent</label>
-                    <input value={parentHandle} onChange={e => setParentHandle(e.target.value)}
-                      placeholder="registro-br" style={{ ...input, maxWidth: 220 }} />
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <FileUploadButton label="Carregar Parent Response .xml" onLoad={setParentXml} />
-                  </div>
-                  <textarea value={parentXml} onChange={e => setParentXml(e.target.value)}
-                    placeholder="<ParentResponse ...>...</ParentResponse>"
-                    style={{ ...textarea, minHeight: 120 }} />
-                  <div>
-                    <button onClick={submitParent} disabled={busy || !parentXml.trim()} style={btn('primary')}>
-                      <Upload size={13} /> Enviar Parent Response
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Publisher Request */}
+          {/* 3 · Publisher Request XML → registro.br */}
           {hasParent && (
             <div>
               <h3 style={{ fontSize: 12, fontWeight: 700, color: hasRepo ? 'var(--green)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
-                4 · Publisher Request XML → registro.br
+                3 · Publisher Request XML → registro.br
                 {hasRepo && <span style={{ marginLeft: 8 }}><CheckCircle size={12} /></span>}
               </h3>
               {hasRepo && !repoXml ? (
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                  O repositório já está configurado — o Publisher Request XML foi processado pelo
-                  registro.br e o Krill não o armazena após a conclusão. Os dados do repositório
-                  estão na seção abaixo.
+                  Repositório já configurado — Publisher Request XML processado e não armazenado pelo Krill após conclusão.
                 </div>
               ) : (
                 <>
@@ -576,41 +539,63 @@ function ConfigSection({ cas, onCaCreated }) {
             </div>
           )}
 
-          {/* Repository Response */}
+          {/* 4 e 5 · Respostas do registro.br — lado a lado */}
           {hasParent && (
-            <div>
-              <h3 style={{ fontSize: 12, fontWeight: 700, color: hasRepo ? 'var(--green)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
-                5 · Repository Response XML ← registro.br
-                {hasRepo && <span style={{ marginLeft: 8 }}><CheckCircle size={12} /></span>}
-              </h3>
-              {hasRepo ? (
-                <div>
-                  <div style={{ fontSize: 12, color: 'var(--green)' }}>
-                    <CheckCircle size={13} style={{ marginRight: 6 }} />
-                    Repositório configurado. Krill pronto para emitir ROAs.
-                  </div>
-                  <CaDetailsPanel ca={selectedCa} section="repo" />
-                </div>
-              ) : (
-                <>
-                  <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                    Cole aqui o "Repository Response" XML fornecido pelo registro.br, ou carregue o arquivo.
-                  </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+
+              {/* 4 · Parent Response */}
+              <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: 14 }}>
+                <h3 style={{ fontSize: 12, fontWeight: 700, color: hasParent ? 'var(--green)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                  4 · Parent Response ← registro.br
+                  {hasParent && <span style={{ marginLeft: 8 }}><CheckCircle size={12} /></span>}
+                </h3>
+                {hasParent ? (
+                  <CaDetailsPanel ca={selectedCa} section="parents" />
+                ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                      <FileUploadButton label="Carregar Repository Response .xml" onLoad={setRepoResponseXml} />
+                    <div>
+                      <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Nome do Parent</label>
+                      <input value={parentHandle} onChange={e => setParentHandle(e.target.value)}
+                        placeholder="registro-br" style={{ ...input, maxWidth: 220 }} />
                     </div>
+                    <FileUploadButton label="Carregar .xml" onLoad={setParentXml} />
+                    <textarea value={parentXml} onChange={e => setParentXml(e.target.value)}
+                      placeholder="<ParentResponse ...>...</ParentResponse>"
+                      style={{ ...textarea, minHeight: 100 }} />
+                    <button onClick={submitParent} disabled={busy || !parentXml.trim()} style={btn('primary')}>
+                      <Upload size={13} /> Enviar
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* 5 · Repository Response */}
+              <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: 14 }}>
+                <h3 style={{ fontSize: 12, fontWeight: 700, color: hasRepo ? 'var(--green)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                  5 · Repository Response ← registro.br
+                  {hasRepo && <span style={{ marginLeft: 8 }}><CheckCircle size={12} /></span>}
+                </h3>
+                {hasRepo ? (
+                  <div>
+                    <div style={{ fontSize: 12, color: 'var(--green)', marginBottom: 4 }}>
+                      <CheckCircle size={13} style={{ marginRight: 6 }} />
+                      Krill pronto para emitir ROAs.
+                    </div>
+                    <CaDetailsPanel ca={selectedCa} section="repo" />
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <FileUploadButton label="Carregar .xml" onLoad={setRepoResponseXml} />
                     <textarea value={repoResponseXml} onChange={e => setRepoResponseXml(e.target.value)}
                       placeholder="<RepositoryResponse ...>...</RepositoryResponse>"
-                      style={{ ...textarea, minHeight: 120 }} />
-                    <div>
-                      <button onClick={submitRepo} disabled={busy || !repoResponseXml.trim()} style={btn('primary')}>
-                        <Upload size={13} /> Enviar Repository Response
-                      </button>
-                    </div>
+                      style={{ ...textarea, minHeight: 100 }} />
+                    <button onClick={submitRepo} disabled={busy || !repoResponseXml.trim()} style={btn('primary')}>
+                      <Upload size={13} /> Enviar
+                    </button>
                   </div>
-                </>
-              )}
+                )}
+              </div>
+
             </div>
           )}
         </>
