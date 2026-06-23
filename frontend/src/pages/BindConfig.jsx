@@ -149,7 +149,7 @@ function Chip({ label, onRemove, locked }) {
   )
 }
 
-function ForwarderEditor({ items, onChange }) {
+function ForwarderEditor({ items, onChange, readOnly = false }) {
   const [val, setVal] = useState('')
   function add() {
     const v = val.trim()
@@ -160,15 +160,17 @@ function ForwarderEditor({ items, onChange }) {
     <div>
       <div style={sectionLabel}>Servidores de encaminhamento (forwarders)</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-        {items.map(i => <Chip key={i} label={i} onRemove={() => onChange(items.filter(x => x !== i))} />)}
+        {items.map(i => <Chip key={i} label={i} locked={readOnly} onRemove={readOnly ? undefined : () => onChange(items.filter(x => x !== i))} />)}
       </div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <input value={val} onChange={e => setVal(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), add())}
-          placeholder="ex: 1.1.1.1 ou 2606:4700:4700::1111"
-          style={{ ...input, flex: 1 }} />
-        <button onClick={add} style={btn('primary')}><Plus size={13} /></button>
-      </div>
+      {!readOnly && (
+        <div style={{ display: 'flex', gap: 6 }}>
+          <input value={val} onChange={e => setVal(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), add())}
+            placeholder="ex: 1.1.1.1 ou 2606:4700:4700::1111"
+            style={{ ...input, flex: 1 }} />
+          <button onClick={add} style={btn('primary')}><Plus size={13} /></button>
+        </div>
+      )}
     </div>
   )
 }
@@ -180,6 +182,7 @@ function AclEditor() {
   const [status, setStatus]    = useState(null)
   const [serverIps, setServerIps] = useState({ ipv4: null, ipv6: null })
   const [newNet, setNewNet]       = useState('')
+  const isAdmin = useIsAdmin()
 
   useEffect(() => {
     Promise.all([api.getAcl(), api.getServerIps()])
@@ -257,37 +260,41 @@ function AclEditor() {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
           {LOCKED_NETWORKS.map(n => <Chip key={n} label={n} locked />)}
           {userNetworks.map(n => (
-            <Chip key={n} label={n} onRemove={() =>
+            <Chip key={n} label={n} locked={!isAdmin} onRemove={isAdmin ? () =>
               set('allow_query', [...LOCKED_NETWORKS, ...userNetworks.filter(x => x !== n)])
-            } />
+            : undefined} />
           ))}
         </div>
-        <div>
-          <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
-            Adicionar bloco público do cliente
-          </label>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <input value={newNet} onChange={e => setNewNet(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addNetwork())}
-              placeholder="ex: 177.130.48.0/20 ou 2804:235c::/32"
-              style={{ ...input, flex: 1 }} />
-            <button onClick={addNetwork} style={btn('primary')}><Plus size={13} /></button>
+        {isAdmin && (
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+              Adicionar bloco público do cliente
+            </label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input value={newNet} onChange={e => setNewNet(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addNetwork())}
+                placeholder="ex: 177.130.48.0/20 ou 2804:235c::/32"
+                style={{ ...input, flex: 1 }} />
+              <button onClick={addNetwork} style={btn('primary')}><Plus size={13} /></button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Forwarders */}
       <div style={panel}>
-        <ForwarderEditor items={acl.forwarders || []} onChange={v => set('forwarders', v)} />
+        <ForwarderEditor items={acl.forwarders || []} onChange={v => set('forwarders', v)} readOnly={!isAdmin} />
       </div>
 
-      {/* Save */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button onClick={save} disabled={saving} style={btn('primary')}>
-          {saving ? <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
-          Salvar e recarregar BIND
-        </button>
-      </div>
+      {/* Save — só admin */}
+      {isAdmin && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button onClick={save} disabled={saving} style={btn('primary')}>
+            {saving ? <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
+            Salvar e recarregar BIND
+          </button>
+        </div>
+      )}
 
       {status && <StatusBadge ok={status.ok} msg={status.msg} />}
     </div>
@@ -755,7 +762,7 @@ const TABS = [
 export default function BindConfig() {
   const [tab, setTab] = useState('acl')
   const isAdmin = useIsAdmin()
-  const visibleTabs = isAdmin ? TABS : TABS.filter(t => t.id !== 'avancado')
+  const visibleTabs = isAdmin ? TABS : TABS.filter(t => t.id === 'acl')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

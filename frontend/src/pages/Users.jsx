@@ -2,13 +2,9 @@ import { useState, useEffect } from 'react'
 import { Users as UsersIcon, Plus, Trash2, Loader, Search, X, KeyRound } from 'lucide-react'
 import { api } from '../api'
 
-const ROLES = ['admin', 'operator', 'viewer']
+const ROLES = ['admin', 'viewer']
 
-const roleColor = {
-  admin:    { color: 'var(--red)',    bg: 'var(--red-dim)'    },
-  operator: { color: 'var(--orange)', bg: 'var(--orange-dim)' },
-  viewer:   { color: 'var(--green)',  bg: 'var(--green-dim)'  },
-}
+const roleColor = {}
 
 function parseUA(ua) {
   if (!ua) return '—'
@@ -215,23 +211,17 @@ export default function Users() {
                           value={u.role}
                           onChange={e => handleRole(u.id, e.target.value)}
                           style={{
-                            background: rc.bg || 'var(--bg-canvas)',
-                            border: `1px solid ${rc.color || 'var(--border)'}`,
+                            background: 'var(--bg-canvas)',
+                            border: '1px solid var(--border)',
                             borderRadius: 4, padding: '3px 8px',
-                            color: rc.color || 'var(--text-primary)',
-                            fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                            textTransform: 'uppercase', outline: 'none',
+                            color: 'var(--text-primary)',
+                            fontSize: 12, cursor: 'pointer', outline: 'none',
                           }}
                         >
-                          {ROLES.map(r => <option key={r} value={r} style={{ textTransform: 'uppercase' }}>{r.toUpperCase()}</option>)}
+                          {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                         </select>
                       ) : (
-                        <span style={{
-                          padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700,
-                          color: rc.color, background: rc.bg,
-                          border: `1px solid ${rc.color || 'var(--border)'}`,
-                          textTransform: 'uppercase',
-                        }}>{u.role}</span>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>{u.role}</span>
                       )}
                     </td>
 
