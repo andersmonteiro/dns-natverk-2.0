@@ -19,10 +19,12 @@ async def login(request: Request, form: OAuth2PasswordRequestForm = Depends()):
     if not user or not verify_password(form.password, user["password"]):
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
 
-    # Captura IP e User-Agent
-    ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "")
-    if ip and "," in ip:
-        ip = ip.split(",")[0].strip()
+    # Captura IP real — tenta X-Forwarded-For (nginx proxy_add), depois X-Real-IP, depois client direto
+    ip = (
+        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or request.headers.get("x-real-ip", "").strip()
+        or (request.client.host if request.client else "")
+    )
     ua = request.headers.get("user-agent", "")
     now = datetime.utcnow().isoformat()
 
