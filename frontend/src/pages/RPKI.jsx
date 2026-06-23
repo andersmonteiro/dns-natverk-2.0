@@ -4,6 +4,7 @@ import {
   RefreshCw, AlertCircle, CheckCircle, XCircle, Clock, Loader,
 } from 'lucide-react'
 import { api } from '../api'
+import { useIsAdmin } from '../context/UserContext'
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
 
@@ -657,6 +658,7 @@ function ConfigSection({ cas, onCaCreated }) {
 // ── Seção: ROAs ───────────────────────────────────────────────────────────────
 
 function ROASection({ ca }) {
+  const isAdmin = useIsAdmin()
   const [roas, setRoas]       = useState([])
   const [loading, setLoading] = useState(false)
   const [asn, setAsn]         = useState('')
@@ -721,24 +723,26 @@ function ROASection({ ca }) {
       <div style={{ fontSize: 12, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 6 }}>
         <CheckCircle size={13} /> Krill pronto para emitir ROAs.
       </div>
-      {/* Formulário add ROA */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'flex-end' }}>
-        <div>
-          <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>ASN</label>
-          <input value={asn} onChange={e => setAsn(e.target.value)} placeholder="64500 ou AS64500" style={input} />
+      {/* Formulário add ROA — apenas admin */}
+      {isAdmin && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'flex-end' }}>
+          <div>
+            <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>ASN</label>
+            <input value={asn} onChange={e => setAsn(e.target.value)} placeholder="64500 ou AS64500" style={input} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Prefixo</label>
+            <input value={prefix} onChange={e => setPrefix(e.target.value)} placeholder="177.130.48.0/22" style={input} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Max Length</label>
+            <input value={maxLen} onChange={e => setMaxLen(e.target.value)} placeholder="igual ao prefixo" style={input} />
+          </div>
+          <button onClick={addRoa} disabled={busy || !asn || !prefix} style={btn('primary')}>
+            <Plus size={13} /> Adicionar
+          </button>
         </div>
-        <div>
-          <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Prefixo</label>
-          <input value={prefix} onChange={e => setPrefix(e.target.value)} placeholder="177.130.48.0/22" style={input} />
-        </div>
-        <div>
-          <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Max Length</label>
-          <input value={maxLen} onChange={e => setMaxLen(e.target.value)} placeholder="igual ao prefixo" style={input} />
-        </div>
-        <button onClick={addRoa} disabled={busy || !asn || !prefix} style={btn('primary')}>
-          <Plus size={13} /> Adicionar
-        </button>
-      </div>
+      )}
 
       {/* Tabela ROAs */}
       {loading ? (
@@ -762,11 +766,13 @@ function ROASection({ ca }) {
                 <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontWeight: 600 }}>{String(r.asn ?? '')}</td>
                 <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>{String(r.prefix ?? '')}</td>
                 <td style={{ padding: '8px 10px', color: 'var(--text-muted)' }}>/{String(r.max_length ?? '')}</td>
-                <td style={{ padding: '8px 10px' }}>
-                  <button onClick={() => removeRoa(r)} disabled={busy} style={btn('danger')}>
-                    <Trash2 size={11} />
-                  </button>
-                </td>
+                {isAdmin && (
+                  <td style={{ padding: '8px 10px' }}>
+                    <button onClick={() => removeRoa(r)} disabled={busy} style={btn('danger')}>
+                      <Trash2 size={11} />
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
