@@ -71,7 +71,16 @@ async def krill_status(user=Depends(get_current_user)):
             if not r.is_success:
                 return {"online": False, "error": f"HTTP {r.status_code}", "cas": []}
         cas_list = await _get("/cas")
-        handles = cas_list.get("cas", [])
+        raw_items = cas_list.get("cas", [])
+        # Krill may return strings ["natverk"] or objects [{"handle":"natverk",...}]
+        handles = []
+        for item in raw_items:
+            if isinstance(item, dict):
+                h = item.get("handle", "")
+            else:
+                h = str(item)
+            if h:
+                handles.append(h)
         cas = []
         for h in handles:
             try:
