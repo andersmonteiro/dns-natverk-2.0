@@ -16,6 +16,8 @@ services:
   krill:
     build: ./krill
     restart: unless-stopped
+    ports:
+      - "3000:3000"
     environment:
       - KRILL_AUTH_TOKEN=${KRILL_AUTH_TOKEN:-change-me-krill-token}
       - KRILL_ADMIN_TOKEN=${KRILL_AUTH_TOKEN:-change-me-krill-token}
