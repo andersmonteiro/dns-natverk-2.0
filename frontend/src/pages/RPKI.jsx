@@ -468,17 +468,27 @@ function ConfigSection({ cas, onCaCreated }) {
             )}
           </div>
 
-          {/* Publisher Request — sempre visível quando parent configurado (para referência) */}
+          {/* Publisher Request */}
           {hasParent && (
             <div>
               <h3 style={{ fontSize: 12, fontWeight: 700, color: hasRepo ? 'var(--green)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
                 4 · Publisher Request XML → registro.br
                 {hasRepo && <span style={{ marginLeft: 8 }}><CheckCircle size={12} /></span>}
               </h3>
-              <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                Copie o XML abaixo e cole no portal do registro.br como "Publisher Request".
-              </p>
-              <XmlDisplay xml={repoXml} loading={loadingXml} />
+              {hasRepo && !repoXml ? (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  O repositório já está configurado — o Publisher Request XML foi processado pelo
+                  registro.br e o Krill não o armazena após a conclusão. Os dados do repositório
+                  estão na seção abaixo.
+                </div>
+              ) : (
+                <>
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                    Copie o XML abaixo e cole no portal do registro.br como "Publisher Request".
+                  </p>
+                  <XmlDisplay xml={repoXml} loading={loadingXml} />
+                </>
+              )}
             </div>
           )}
 
