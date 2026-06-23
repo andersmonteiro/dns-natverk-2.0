@@ -27,6 +27,7 @@ export default function Users() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [me, setMe] = useState(null)
 
   // New user form
   const [newUsername, setNewUsername] = useState('')
@@ -36,8 +37,9 @@ export default function Users() {
 
   async function load() {
     try {
-      const data = await api.listUsers()
+      const [data, meData] = await Promise.all([api.listUsers(), api.me()])
       setUsers(Array.isArray(data) ? data : (data.items || []))
+      setMe(meData)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -159,23 +161,27 @@ export default function Users() {
                     {u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : '—'}
                   </td>
                   <td style={{ padding: '9px 10px', display: 'flex', gap: 6 }}>
-                    {ROLES.filter(r => r !== u.role).map(r => (
-                      <button key={r} onClick={() => changeRole(u.id, r)} style={{
-                        background: 'transparent',
-                        border: `1px solid ${roleBadge[r]?.color || 'var(--border)'}`,
-                        borderRadius: 4, padding: '3px 8px',
-                        color: roleBadge[r]?.color || 'var(--text-secondary)',
-                        fontSize: 11, cursor: 'pointer',
-                      }}>{r}</button>
-                    ))}
-                    <button onClick={() => deleteUser(u.id)} style={{
-                      background: 'transparent', border: '1px solid var(--red-dim)',
-                      borderRadius: 4, padding: '3px 8px',
-                      color: 'var(--red)', fontSize: 11, cursor: 'pointer',
-                      display: 'inline-flex', alignItems: 'center', gap: 4,
-                    }}>
-                      <Trash2 size={11} />
-                    </button>
+                    {me?.role === 'admin' && me?.username !== u.username && (
+                      <>
+                        {ROLES.filter(r => r !== u.role).map(r => (
+                          <button key={r} onClick={() => changeRole(u.id, r)} style={{
+                            background: 'transparent',
+                            border: `1px solid ${roleBadge[r]?.color || 'var(--border)'}`,
+                            borderRadius: 4, padding: '3px 8px',
+                            color: roleBadge[r]?.color || 'var(--text-secondary)',
+                            fontSize: 11, cursor: 'pointer',
+                          }}>{r}</button>
+                        ))}
+                        <button onClick={() => deleteUser(u.id)} style={{
+                          background: 'transparent', border: '1px solid var(--red-dim)',
+                          borderRadius: 4, padding: '3px 8px',
+                          color: 'var(--red)', fontSize: 11, cursor: 'pointer',
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                        }}>
+                          <Trash2 size={11} />
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
