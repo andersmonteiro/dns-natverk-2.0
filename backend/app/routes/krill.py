@@ -160,6 +160,15 @@ async def configure_repo(ca: str, data: ConfigureRepo, user=Depends(require_admi
     return await _post(f"/cas/{ca}/repo", xml=data.response_xml)
 
 
+@router.get("/cas/{ca}/repo-contact")
+async def repo_contact(ca: str, user=Depends(get_current_user)):
+    """Retorna os dados do repositório configurado no Krill."""
+    try:
+        return await _get(f"/cas/{ca}/repo")
+    except Exception as e:
+        return {"error": str(e)}
+
+
 # ── ROAs ──────────────────────────────────────────────────────────────────────
 
 @router.get("/cas/{ca}/roas")

@@ -115,6 +115,81 @@ function XmlDisplay({ xml, loading }) {
   )
 }
 
+function FileUploadButton({ onLoad, label = 'Carregar arquivo .xml' }) {
+  function handleChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => onLoad(ev.target.result || '')
+    reader.readAsText(file)
+    e.target.value = ''   // reset so same file can be re-selected
+  }
+  return (
+    <label style={{
+      ...btn('ghost'), cursor: 'pointer', display: 'inline-flex',
+      alignItems: 'center', gap: 6, padding: '7px 14px',
+    }}>
+      <Upload size={13} /> {label}
+      <input type="file" accept=".xml,.txt" onChange={handleChange} style={{ display: 'none' }} />
+    </label>
+  )
+}
+
+function RepoContactDisplay({ ca }) {
+  const [contact, setContact] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!ca) return
+    api.krillRepoContact(ca)
+      .then(r => setContact(r))
+      .catch(() => setContact(null))
+      .finally(() => setLoading(false))
+  }, [ca])
+
+  if (loading) return <div style={{ color: 'var(--text-muted)', fontSize: 12 }}><Loader size={12} /> Carregando...</div>
+  if (!contact || contact.error) return null
+
+  // Krill returns {type, contact: {...}} or the object directly
+  const info = contact.contact || contact
+  const fields = [
+    ['Publisher Handle', info.publisher_handle],
+    ['Service URI',      info.service_uri],
+    ['SIA Base (rsync)', info.sia_base],
+    ['RRDP Notification', info.rrdp_notification_uri],
+  ].filter(([, v]) => v)
+
+  if (!fields.length) return null
+
+  return (
+    <div style={{
+      marginTop: 10, padding: '12px 14px',
+      background: 'var(--bg-panel)', border: '1px solid var(--border)',
+      borderRadius: 'var(--r-sm)', fontSize: 12,
+    }}>
+      <div style={{ fontWeight: 700, color: 'var(--text-muted)', fontSize: 11, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
+        Dados do Repositório
+      </div>
+      <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+        <tbody>
+          {fields.map(([label, value]) => (
+            <tr key={label}>
+              <td style={{ padding: '3px 10px 3px 0', color: 'var(--text-muted)', whiteSpace: 'nowrap', verticalAlign: 'top' }}>{label}</td>
+              <td style={{ padding: '3px 0', fontFamily: 'monospace', wordBreak: 'break-all', color: 'var(--text-primary)' }}>
+                {value}
+                <button onClick={() => navigator.clipboard.writeText(value)}
+                  style={{ ...btn('ghost'), padding: '1px 6px', marginLeft: 6, fontSize: 10 }}>
+                  <Copy size={10} />
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 // ── CollapsibleSection ────────────────────────────────────────────────────────
 
 function CollapsibleSection({ title, icon: Icon, badge, children, defaultOpen = false }) {
@@ -381,6 +456,9 @@ function ConfigSection({ cas, onCaCreated }) {
                     <input value={parentHandle} onChange={e => setParentHandle(e.target.value)}
                       placeholder="registro-br" style={{ ...input, maxWidth: 220 }} />
                   </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <FileUploadButton label="Carregar Parent Response .xml" onLoad={setParentXml} />
+                  </div>
                   <textarea value={parentXml} onChange={e => setParentXml(e.target.value)}
                     placeholder="<ParentResponse ...>...</ParentResponse>"
                     style={{ ...textarea, minHeight: 120 }} />
@@ -415,16 +493,22 @@ function ConfigSection({ cas, onCaCreated }) {
                 {hasRepo && <span style={{ marginLeft: 8 }}><CheckCircle size={12} /></span>}
               </h3>
               {hasRepo ? (
-                <div style={{ fontSize: 12, color: 'var(--green)' }}>
-                  <CheckCircle size={13} style={{ marginRight: 6 }} />
-                  Repositório configurado. Krill pronto para emitir ROAs.
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--green)', marginBottom: 8 }}>
+                    <CheckCircle size={13} style={{ marginRight: 6 }} />
+                    Repositório configurado. Krill pronto para emitir ROAs.
+                  </div>
+                  <RepoContactDisplay ca={selectedCa} />
                 </div>
               ) : (
                 <>
                   <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                    Cole aqui o "Repository Response" XML fornecido pelo registro.br.
+                    Cole aqui o "Repository Response" XML fornecido pelo registro.br, ou carregue o arquivo.
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <FileUploadButton label="Carregar Repository Response .xml" onLoad={setRepoResponseXml} />
+                    </div>
                     <textarea value={repoResponseXml} onChange={e => setRepoResponseXml(e.target.value)}
                       placeholder="<RepositoryResponse ...>...</RepositoryResponse>"
                       style={{ ...textarea, minHeight: 120 }} />
