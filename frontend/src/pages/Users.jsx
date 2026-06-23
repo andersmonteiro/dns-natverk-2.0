@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Users as UsersIcon, Plus, Trash2, Loader, Search, X, KeyRound } from 'lucide-react'
 import { api } from '../api'
+import { useUser, useIsAdmin } from '../context/UserContext'
 
 const ROLES = ['admin', 'viewer']
 
@@ -70,10 +71,13 @@ function Modal({ title, onClose, children }) {
 
 export default function Users() {
   const [users, setUsers]       = useState([])
-  const [me, setMe]             = useState(null)
   const [loading, setLoading]   = useState(true)
   const [search, setSearch]     = useState('')
   const [error, setError]       = useState('')
+
+  // Usa UserContext em vez de chamar api.me() separadamente
+  const { user: me } = useUser() || {}
+  const isAdmin = useIsAdmin()
 
   // Modal: criar usuário
   const [showCreate, setShowCreate] = useState(false)
@@ -82,16 +86,15 @@ export default function Users() {
   const [createErr, setCreateErr]   = useState('')
 
   // Modal: reset senha
-  const [editUser, setEditUser]     = useState(null)  // {id, username}
+  const [editUser, setEditUser]     = useState(null)
   const [newPass, setNewPass]       = useState('')
   const [resetting, setResetting]   = useState(false)
   const [resetErr, setResetErr]     = useState('')
 
   async function load() {
     try {
-      const [data, meData] = await Promise.all([api.listUsers(), api.me()])
+      const data = await api.listUsers()
       setUsers(Array.isArray(data) ? data : (data.items || []))
-      setMe(meData)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -134,7 +137,6 @@ export default function Users() {
     finally { setResetting(false) }
   }
 
-  const isAdmin = me?.role === 'admin'
   const filtered = users.filter(u => u.username.toLowerCase().includes(search.toLowerCase()))
 
   return (
