@@ -482,64 +482,67 @@ async def remove_roa(ca: str, roa: RemoveROA, user=Depends(require_admin)):
 
 # ── BGP / RPKI Validation via RIPE NCC ───────────────────────────────────────
 
+import asyncio
+
 RIPE_VALIDATOR = "https://rpki-validator.ripe.net/api/v1/validity"
+RIPE_STAT      = "https://stat.ripe.net/data/announced-prefixes/data.json"
+
+async def _validate_prefix(client: httpx.AsyncClient, asn_str: str, prefix: str) -> dict:
+    """Valida um prefixo BGP contra o RIPE RPKI Validator."""
+    try:
+        encoded = prefix.replace("/", "%2F")
+        resp = await client.get(f"{RIPE_VALIDATOR}/{asn_str}/{encoded}", timeout=15)
+        if resp.is_success:
+            vr  = resp.json().get("validated_route", {})
+            val = vr.get("validity", {})
+            return {
+                "asn":    asn_str,
+                "prefix": prefix,
+                "state":  val.get("state", "Unknown"),
+            }
+        return {"asn": asn_str, "prefix": prefix, "state": "Error"}
+    except Exception:
+        return {"asn": asn_str, "prefix": prefix, "state": "Error"}
+
 
 @router.get("/cas/{ca}/bgp")
 async def bgp_analysis(ca: str, user=Depends(get_current_user)):
-    """Valida cada ROA da CA contra o RIPE RPKI Validator público."""
+    """Lista todos os prefixos BGP anunciados pelo ASN da CA e valida via RIPE RPKI Validator."""
     try:
-        # 1. Pega os ROAs configurados
-        roa_data = await _get(f"/cas/{ca}/routes")
-        if isinstance(roa_data, list):
-            roas = roa_data
-        else:
-            roas = roa_data.get("authorized") or roa_data.get("roas") or []
+        # 1. Descobre o ASN da CA
+        detail  = await _get(f"/cas/{ca}")
+        raw_res = detail.get("resources") or {}
+        asn_raw = str(raw_res.get("asn", "") or "").strip()
+        if not asn_raw:
+            return {"results": [], "error": "ASN não configurado na CA", "source": "ripe"}
+        asn_str = asn_raw if asn_raw.upper().startswith("AS") else f"AS{asn_raw}"
 
-        if not roas:
-            return {"results": [], "source": "ripe-validator"}
+        async with httpx.AsyncClient(timeout=20) as client:
+            # 2. Busca todos os prefixos BGP anunciados pelo AS no RIPE Stat
+            stat = await client.get(f"{RIPE_STAT}?resource={asn_str}")
+            if not stat.is_success:
+                return {"results": [], "error": f"RIPE Stat HTTP {stat.status_code}", "source": "ripe"}
 
-        # 2. Consulta a RIPE para cada par ASN+prefixo
-        results = []
-        async with httpx.AsyncClient(timeout=15) as client:
-            for r in roas:
-                if not isinstance(r, dict):
-                    continue
-                asn    = str(r.get("asn", "")).strip()
-                prefix = str(r.get("prefix", "")).strip()
-                if not asn or not prefix:
-                    continue
-                # Garante formato "AS52747"
-                asn_str = asn if asn.upper().startswith("AS") else f"AS{asn}"
-                try:
-                    encoded = prefix.replace("/", "%2F")
-                    resp = await client.get(f"{RIPE_VALIDATOR}/{asn_str}/{encoded}")
-                    if resp.is_success:
-                        ripe = resp.json()
-                        vr   = ripe.get("validated_route", {})
-                        val  = vr.get("validity", {})
-                        results.append({
-                            "asn":         asn_str,
-                            "prefix":      prefix,
-                            "max_length":  r.get("max_length"),
-                            "state":       val.get("state", "Unknown"),
-                            "description": val.get("description", ""),
-                            "matched_vrps": val.get("VRPs", {}).get("matched", []),
-                        })
-                    else:
-                        results.append({
-                            "asn": asn_str, "prefix": prefix,
-                            "max_length": r.get("max_length"),
-                            "state": "Error", "description": f"HTTP {resp.status_code}",
-                            "matched_vrps": [],
-                        })
-                except Exception as e:
-                    results.append({
-                        "asn": asn_str, "prefix": prefix,
-                        "max_length": r.get("max_length"),
-                        "state": "Error", "description": str(e),
-                        "matched_vrps": [],
-                    })
+            prefixes = [
+                p["prefix"]
+                for p in stat.json().get("data", {}).get("prefixes", [])
+                if isinstance(p, dict) and p.get("prefix")
+            ]
+            if not prefixes:
+                return {"results": [], "asn": asn_str, "source": "ripe"}
 
-        return {"results": results, "source": "ripe-validator"}
+            # 3. Valida todos em paralelo (máx 20 simultâneos para não sobrecarregar a RIPE)
+            sem = asyncio.Semaphore(20)
+            async def _bounded(prefix):
+                async with sem:
+                    return await _validate_prefix(client, asn_str, prefix)
+
+            results = await asyncio.gather(*[_bounded(p) for p in prefixes])
+
+        # Ordena: inválidos primeiro, depois não-encontrado, depois válidos
+        order = {"Invalid": 0, "NotFound": 1, "Valid": 2, "Unknown": 3, "Error": 4}
+        results = sorted(results, key=lambda r: (order.get(r.get("state", ""), 5), r.get("prefix", "")))
+
+        return {"results": list(results), "asn": asn_str, "source": "ripe"}
     except Exception as e:
-        return {"results": [], "error": str(e), "source": "ripe-validator"}
+        return {"results": [], "error": str(e), "source": "ripe"}

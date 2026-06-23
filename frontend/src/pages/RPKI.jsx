@@ -780,12 +780,25 @@ function ROASection({ ca }) {
 
 // ── Seção: BGP Analysis (via RIPE RPKI Validator) ────────────────────────────
 
-const STATE_COLOR = { Valid: 'var(--green)', Invalid: 'var(--red)', NotFound: 'var(--orange)', Error: 'var(--red)' }
-const STATE_ICON  = { Valid: 'check', Invalid: 'x', NotFound: 'clock', Error: 'x' }
-const STATE_LABEL = { Valid: 'Válido', Invalid: 'Inválido', NotFound: 'Não encontrado', Error: 'Erro' }
+function RpkiBadge({ state }) {
+  const cfg = {
+    Valid:    { bg: '#1a3a1a', border: '#2d6a2d', text: '#4caf50', label: 'VALID' },
+    Invalid:  { bg: '#3a1a1a', border: '#6a2d2d', text: '#f44336', label: 'INVALID' },
+    NotFound: { bg: '#2a2a1a', border: '#5a5a1a', text: '#ff9800', label: 'NOT FOUND' },
+    Error:    { bg: '#3a1a1a', border: '#6a2d2d', text: '#f44336', label: 'ERROR' },
+  }
+  const c = cfg[state] || { bg: 'var(--bg-panel)', border: 'var(--border)', text: 'var(--text-muted)', label: state }
+  return (
+    <span style={{
+      display: 'inline-block', padding: '2px 8px', borderRadius: 3, fontSize: 11,
+      fontWeight: 700, letterSpacing: '0.5px',
+      background: c.bg, border: `1px solid ${c.border}`, color: c.text,
+    }}>{c.label}</span>
+  )
+}
 
 function BGPSection({ ca }) {
-  const [results, setResults] = useState(null)
+  const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState(null)
 
@@ -794,7 +807,7 @@ function BGPSection({ ca }) {
     setLoading(true); setStatusMsg(null)
     try {
       const r = await api.krillBgp(ca)
-      setResults(Array.isArray(r?.results) ? r.results : [])
+      setData(r)
       if (r?.error) setStatusMsg({ ok: false, msg: `Erro: ${r.error}` })
     } catch (e) {
       setStatusMsg({ ok: false, msg: String(e.message) })
@@ -805,61 +818,63 @@ function BGPSection({ ca }) {
 
   if (!ca) return <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Selecione uma CA primeiro.</div>
 
+  const results = Array.isArray(data?.results) ? data.results : []
+  const counts  = results.reduce((a, r) => { a[r.state] = (a[r.state] || 0) + 1; return a }, {})
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-          Fonte: <a href="https://rpki-validator.ripe.net/ui/" target="_blank" rel="noreferrer"
-            style={{ color: 'var(--accent)' }}>RIPE NCC RPKI Validator</a>
-        </span>
-        <button onClick={load} disabled={loading} style={btn('ghost')}>
-          <RefreshCw size={13} /> Atualizar
-        </button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {data?.asn && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>ASN: <strong style={{ color: 'var(--accent)' }}>{data.asn}</strong></span>}
+          {results.length > 0 && (
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              {results.length} prefixo{results.length > 1 ? 's' : ''}
+              {counts.Valid    ? <> · <span style={{ color: '#4caf50' }}>{counts.Valid} válido{counts.Valid > 1 ? 's' : ''}</span></> : null}
+              {counts.Invalid  ? <> · <span style={{ color: '#f44336' }}>{counts.Invalid} inválido{counts.Invalid > 1 ? 's' : ''}</span></> : null}
+              {counts.NotFound ? <> · <span style={{ color: '#ff9800' }}>{counts.NotFound} não encontrado{counts.NotFound > 1 ? 's' : ''}</span></> : null}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+            Fonte: <a href="https://rpki-validator.ripe.net/ui/" target="_blank" rel="noreferrer"
+              style={{ color: 'var(--accent)' }}>RIPE NCC RPKI Validator</a>
+          </span>
+          <button onClick={load} disabled={loading} style={btn('ghost')}>
+            <RefreshCw size={13} /> Atualizar
+          </button>
+        </div>
       </div>
 
       {loading ? (
-        <div style={{ color: 'var(--text-muted)', fontSize: 12 }}><Loader size={14} /> Consultando RIPE...</div>
-      ) : results === null ? (
+        <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: 24, textAlign: 'center' }}>
+          <Loader size={14} /> Consultando RIPE Stat + RPKI Validator...
+        </div>
+      ) : data === null ? (
         <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: 24 }}>
           Clique em Atualizar para carregar.
         </div>
       ) : results.length === 0 ? (
         <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: 24 }}>
-          Nenhum ROA configurado para validar.
+          Nenhum prefixo BGP anunciado encontrado para {data?.asn || 'este ASN'}.
         </div>
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid var(--border)' }}>
-              {['ASN', 'Prefixo', 'Max Length', 'Status RPKI'].map(h => (
-                <th key={h} style={{ textAlign: 'left', padding: '7px 10px', color: 'var(--text-muted)', fontWeight: 600, fontSize: 11 }}>{h}</th>
+            <tr style={{ borderBottom: '2px solid var(--border)' }}>
+              {['Prefixo', 'BGP Origin ASN', 'RPKI Status'].map(h => (
+                <th key={h} style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {results.map((r, i) => {
-              const state = r.state || 'NotFound'
-              const color = STATE_COLOR[state] || 'var(--text-muted)'
-              return (
-                <tr key={i} style={{ borderBottom: '1px solid var(--border-dim)' }}>
-                  <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontWeight: 600 }}>{String(r.asn ?? '')}</td>
-                  <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>{String(r.prefix ?? '')}</td>
-                  <td style={{ padding: '8px 10px', color: 'var(--text-muted)' }}>/{String(r.max_length ?? '')}</td>
-                  <td style={{ padding: '8px 10px' }}>
-                    <span style={{ color, fontWeight: 600, fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      {state === 'Valid'    && <CheckCircle size={12} />}
-                      {state === 'Invalid'  && <XCircle size={12} />}
-                      {state === 'NotFound' && <Clock size={12} />}
-                      {state === 'Error'    && <XCircle size={12} />}
-                      {STATE_LABEL[state] || state}
-                    </span>
-                    {r.description && state !== 'Valid' && (
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{r.description}</div>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
+            {results.map((r, i) => (
+              <tr key={i} style={{ borderBottom: '1px solid var(--border-dim)' }}>
+                <td style={{ padding: '9px 12px', fontFamily: 'monospace', fontSize: 13 }}>{String(r.prefix ?? '')}</td>
+                <td style={{ padding: '9px 12px', fontFamily: 'monospace', fontWeight: 600, color: 'var(--accent)' }}>{String(r.asn ?? '')}</td>
+                <td style={{ padding: '9px 12px' }}><RpkiBadge state={r.state || 'NotFound'} /></td>
+              </tr>
+            ))}
           </tbody>
         </table>
       )}
