@@ -20,7 +20,9 @@ async def list_whitelist(user=Depends(get_current_user)):
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute(
-            "SELECT domain, reason, created_at, created_by FROM whitelist_domain ORDER BY created_at DESC"
+            """SELECT domain, reason, created_at, created_by, source
+               FROM whitelist_domain
+               ORDER BY CASE WHEN source = 'manual' THEN 0 ELSE 1 END, created_at DESC"""
         )
         rows = await cursor.fetchall()
     return [dict(r) for r in rows]
@@ -34,7 +36,7 @@ async def add_whitelist(data: DomainIn, user=Depends(require_admin)):
     async with aiosqlite.connect(DB_PATH) as db:
         try:
             await db.execute(
-                "INSERT INTO whitelist_domain (domain, reason, created_by) VALUES (?, ?, ?)",
+                "INSERT INTO whitelist_domain (domain, reason, created_by, source) VALUES (?, ?, ?, 'manual')",
                 (domain, data.reason.strip(), user["username"])
             )
             await db.execute(
@@ -76,7 +78,7 @@ async def seed_whitelist(data: SeedIn, user=Depends(require_admin)):
             reason = defaults_map.get(domain, "Padrão do sistema")
             try:
                 await db.execute(
-                    "INSERT INTO whitelist_domain (domain, reason, created_by) VALUES (?, ?, ?)",
+                    "INSERT INTO whitelist_domain (domain, reason, created_by, source) VALUES (?, ?, ?, 'default')",
                     (domain, reason, user["username"])
                 )
                 inserted += 1

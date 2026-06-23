@@ -75,16 +75,32 @@ async def init_db():
 
         # Migrations — adiciona colunas novas sem quebrar DB existente
         for table, col, definition in [
-            ("users",          "last_login_at", "DATETIME"),
-            ("users",          "last_login_ip", "TEXT"),
-            ("users",          "last_login_ua", "TEXT"),
-            ("blocked_domain", "source",        "TEXT DEFAULT 'manual'"),
+            ("users",            "last_login_at", "DATETIME"),
+            ("users",            "last_login_ip", "TEXT"),
+            ("users",            "last_login_ua", "TEXT"),
+            ("blocked_domain",   "source",        "TEXT DEFAULT 'manual'"),
+            ("whitelist_domain", "source",        "TEXT DEFAULT 'manual'"),
         ]:
             try:
                 await db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {definition}")
                 await db.commit()
             except Exception:
                 pass  # coluna já existe
+
+        # Semeia whitelist padrão se ainda não foi semeada
+        from .domain_utils import WHITELIST_DEFAULTS
+        cur = await db.execute("SELECT COUNT(*) FROM whitelist_domain WHERE source = 'default'")
+        row = await cur.fetchone()
+        if row[0] == 0:
+            for domain, reason in WHITELIST_DEFAULTS:
+                try:
+                    await db.execute(
+                        "INSERT INTO whitelist_domain (domain, reason, created_by, source) VALUES (?, ?, 'system', 'default')",
+                        (domain, reason)
+                    )
+                except Exception:
+                    pass  # já existe
+            await db.commit()
 
         # Admin padrão se não existir
         from passlib.context import CryptContext

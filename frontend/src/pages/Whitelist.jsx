@@ -306,7 +306,7 @@ export default function Whitelist() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['Domínio', 'Motivo', 'Adicionado por', 'Data', isAdmin ? '' : null].filter(Boolean).map(h => (
+                {['Domínio', 'Motivo', 'Origem', 'Data', isAdmin ? '' : null].filter(Boolean).map(h => (
                   <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--text-muted)', fontWeight: 600, fontSize: 11 }}>{h}</th>
                 ))}
               </tr>
@@ -319,7 +319,16 @@ export default function Whitelist() {
                 >
                   <td style={{ padding: '9px 10px', color: 'var(--green)', fontWeight: 600, fontFamily: 'monospace' }}>{item.domain}</td>
                   <td style={{ padding: '9px 10px', color: 'var(--text-secondary)' }}>{item.reason || '—'}</td>
-                  <td style={{ padding: '9px 10px', color: 'var(--text-muted)' }}>{item.created_by || '—'}</td>
+                  <td style={{ padding: '9px 10px' }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
+                      background: item.source === 'manual' ? 'var(--accent)' : 'var(--bg-panel-2)',
+                      color: item.source === 'manual' ? '#fff' : 'var(--text-muted)',
+                      border: item.source === 'manual' ? 'none' : '1px solid var(--border)',
+                    }}>
+                      {item.source === 'manual' ? 'manual' : 'padrão'}
+                    </span>
+                  </td>
                   <td style={{ padding: '9px 10px', color: 'var(--text-muted)' }}>
                     {item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : '—'}
                   </td>
