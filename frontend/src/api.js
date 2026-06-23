@@ -104,6 +104,26 @@ export const api = {
   mtr:        (data) => request('/tools/mtr',        { method: 'POST', body: JSON.stringify(data) }),
   whois:      (data) => request('/tools/whois',      { method: 'POST', body: JSON.stringify(data) }),
 
+  // Importação em lote de bloqueios
+  importBlocksPreview: async (files) => {
+    const form = new FormData()
+    files.forEach(f => form.append('files', f))
+    const token = localStorage.getItem('dns_panel_token')
+    const res = await fetch('/api/blocks/import/preview', {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    })
+    if (res.status === 401) { clearToken(); window.location.href = '/login'; return }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new Error(err.detail || 'Erro desconhecido')
+    }
+    return res.json()
+  },
+  importBlocksApply: (domains, source) =>
+    request('/blocks/import/apply', { method: 'POST', body: JSON.stringify({ domains, source }) }),
+
   // Backups
   listBackups:   () => request('/backups/'),
   restoreBackup: (path) => request('/backups/restore', { method: 'POST', body: JSON.stringify({ path }) }),

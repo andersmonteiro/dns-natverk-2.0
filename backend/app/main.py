@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .db import init_db
 from .config import settings
-from .routes import auth, metrics, ops, blocks, whitelist, audit, users, tools, backups, bindlog, bindconfig, krill
+from .routes import auth, metrics, ops, blocks, blocks_import, whitelist, audit, users, tools, backups, bindlog, bindconfig, krill
 
 app = FastAPI(title="DNS Panel", version="1.0.0", docs_url="/api/docs")
 
@@ -19,6 +19,7 @@ app.include_router(auth.router)
 app.include_router(metrics.router)
 app.include_router(ops.router)
 app.include_router(blocks.router)
+app.include_router(blocks_import.router)
 app.include_router(whitelist.router)
 app.include_router(audit.router)
 app.include_router(users.router)

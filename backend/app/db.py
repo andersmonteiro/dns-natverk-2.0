@@ -74,13 +74,14 @@ async def init_db():
         await db.commit()
 
         # Migrations — adiciona colunas novas sem quebrar DB existente
-        for col, definition in [
-            ("last_login_at", "DATETIME"),
-            ("last_login_ip", "TEXT"),
-            ("last_login_ua", "TEXT"),
+        for table, col, definition in [
+            ("users",          "last_login_at", "DATETIME"),
+            ("users",          "last_login_ip", "TEXT"),
+            ("users",          "last_login_ua", "TEXT"),
+            ("blocked_domain", "source",        "TEXT DEFAULT 'manual'"),
         ]:
             try:
-                await db.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
+                await db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {definition}")
                 await db.commit()
             except Exception:
                 pass  # coluna já existe
