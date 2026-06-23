@@ -68,6 +68,32 @@ else
 fi
 
 # ── 3. Clone ou atualiza o projeto ────────────────────────────────────────────
+
+# Configura SSH para usar a deploy key (necessário para repo privado)
+DEPLOY_KEY="/root/.ssh/deploy_key"
+if [ ! -f "$DEPLOY_KEY" ]; then
+  error "Deploy key não encontrada em $DEPLOY_KEY.\nGere a chave com: ssh-keygen -t ed25519 -f $DEPLOY_KEY -N \"\"\nE cadastre a chave pública no GitHub como Deploy Key do repositório."
+fi
+
+mkdir -p /root/.ssh
+chmod 700 /root/.ssh
+
+# Garante que github.com usa a deploy key
+if ! grep -q "IdentityFile $DEPLOY_KEY" /root/.ssh/config 2>/dev/null; then
+  cat >> /root/.ssh/config <<EOF
+
+Host github.com
+  HostName github.com
+  User git
+  IdentityFile $DEPLOY_KEY
+  StrictHostKeyChecking no
+EOF
+  chmod 600 /root/.ssh/config
+fi
+
+GIT_SSH_COMMAND="ssh -i $DEPLOY_KEY -o StrictHostKeyChecking=no"
+export GIT_SSH_COMMAND
+
 if [ -d "$INSTALL_DIR/.git" ]; then
   info "Projeto já existe em $INSTALL_DIR — atualizando..."
   git -C "$INSTALL_DIR" pull
@@ -77,7 +103,7 @@ if [ -d "$INSTALL_DIR/.git" ]; then
   success "Containers parados."
 else
   info "Clonando projeto em $INSTALL_DIR..."
-  git clone https://github.com/andersmonteiro/dns-natverk-2.0.git "$INSTALL_DIR"
+  git clone git@github.com:andersmonteiro/dns-natverk-2.0.git "$INSTALL_DIR"
   success "Projeto clonado."
 fi
 
