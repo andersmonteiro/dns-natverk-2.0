@@ -1,8 +1,10 @@
 """
 Coletor do querylog do BIND9.
 Faz tail do arquivo de log e insere eventos no SQLite em batch.
+Detecta rotação de log via inode para não perder eventos após o BIND rotacionar o arquivo.
 """
 import asyncio
+import os
 import re
 import time
 import aiosqlite
@@ -52,6 +54,13 @@ async def _flush(db: aiosqlite.Connection):
     _stats["last_flush_ts"] = time.time()
 
 
+def _open_log(log_path: Path):
+    """Abre o arquivo de log e retorna (file_handle, inode)."""
+    f = open(log_path, "r", errors="replace")
+    inode = os.stat(log_path).st_ino
+    return f, inode
+
+
 async def collect_forever():
     _stats["running"] = True
     log_path = Path(settings.bind_log_path)
@@ -64,10 +73,11 @@ async def collect_forever():
         await db.execute("PRAGMA synchronous=NORMAL")
 
         # Abre no final do arquivo (não reprocessa histórico)
-        with open(log_path, "r", errors="replace") as f:
-            f.seek(0, 2)
-            last_flush = time.monotonic()
+        f, current_inode = _open_log(log_path)
+        f.seek(0, 2)
+        last_flush = time.monotonic()
 
+        try:
             while True:
                 line = f.readline()
                 if line:
@@ -81,6 +91,17 @@ async def collect_forever():
                         ))
                         _stats["events_total"] += 1
                 else:
+                    # Detecta rotação de log: compara inode do arquivo atual com o aberto
+                    try:
+                        new_inode = os.stat(log_path).st_ino
+                        if new_inode != current_inode:
+                            # BIND rotacionou o log — reabre do início do novo arquivo
+                            f.close()
+                            f, current_inode = _open_log(log_path)
+                            # Não faz seek(0,2): lê desde o início para não perder queries
+                    except FileNotFoundError:
+                        pass  # Arquivo temporariamente ausente durante rotação
+
                     # Flush periódico
                     if time.monotonic() - last_flush >= FLUSH_INTERVAL:
                         try:
@@ -89,3 +110,5 @@ async def collect_forever():
                             pass
                         last_flush = time.monotonic()
                     await asyncio.sleep(0.1)
+        finally:
+            f.close()
