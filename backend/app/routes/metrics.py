@@ -14,7 +14,7 @@ def _range_to_ts(range_str: str) -> int:
     """Converte string de range para timestamp Unix (início da janela)."""
     now = int(time.time())
     mapping = {
-        "1h": 3600, "6h": 21600, "12h": 43200,
+        "1h": 3600, "3h": 10800, "6h": 21600, "12h": 43200,
         "24h": 86400, "7d": 604800, "30d": 2592000,
     }
     delta = mapping.get(range_str, 86400)
@@ -31,6 +31,23 @@ async def system_metrics(user=Depends(get_current_user)):
     }
 
 
+def _fill_buckets_simple(rows, since: int, bucket_secs: int) -> list:
+    """
+    Preenche todos os buckets do período com 0 onde não há dados.
+    Garante que o gráfico sempre tem pontos suficientes para desenhar uma linha.
+    """
+    now = int(time.time())
+    data = {r["bucket"]: r["count"] for r in rows}
+    start = (since // bucket_secs) * bucket_secs
+    end   = (now   // bucket_secs) * bucket_secs
+    result = []
+    b = start
+    while b <= end:
+        result.append({"ts": b, "count": data.get(b, 0)})
+        b += bucket_secs
+    return result
+
+
 @router.get("/queries/timeseries")
 async def queries_timeseries(
     range: str = Query("24h"),
@@ -38,7 +55,7 @@ async def queries_timeseries(
     user=Depends(get_current_user)
 ):
     since = _range_to_ts(range)
-    bucket_secs = {"5m": 300, "15m": 900, "1h": 3600}.get(bucket, 3600)
+    bucket_secs = {"5m": 300, "15m": 900, "1h": 3600, "6h": 21600, "1d": 86400}.get(bucket, 3600)
 
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
@@ -53,7 +70,7 @@ async def queries_timeseries(
         """, (bucket_secs, bucket_secs, since))
         rows = await cursor.fetchall()
 
-    return [{"ts": r["bucket"], "count": r["count"]} for r in rows]
+    return _fill_buckets_simple(rows, since, bucket_secs)
 
 
 @router.get("/queries/total")
@@ -182,18 +199,24 @@ async def queries_timeseries_by_type(
         rows = await cursor.fetchall()
 
     from collections import defaultdict
+    now = int(time.time())
     data: dict = defaultdict(dict)
     qtypes_seen: set = set()
     for r in rows:
         data[r["bucket"]][r["qtype"]] = r["count"]
         qtypes_seen.add(r["qtype"])
 
+    # Preenche todos os buckets do período (zeros onde não há dados)
+    start = (since // bucket_secs) * bucket_secs
+    end   = (now   // bucket_secs) * bucket_secs
     result = []
-    for ts_bucket in sorted(data.keys()):
-        entry = {"ts": ts_bucket}
+    b = start
+    while b <= end:
+        entry = {"ts": b}
         for qt in qtypes_seen:
-            entry[qt] = data[ts_bucket].get(qt, 0)
+            entry[qt] = data[b].get(qt, 0) if b in data else 0
         result.append(entry)
+        b += bucket_secs
     return result
 
 

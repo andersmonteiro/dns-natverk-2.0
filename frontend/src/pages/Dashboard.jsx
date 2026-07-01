@@ -68,7 +68,7 @@ export default function Dashboard() {
   }, [])
 
   const loadMetrics = useCallback(async () => {
-    const bucket = range === '1h' ? '5m' : range === '6h' ? '15m' : '1h'
+    const bucket = { '1h': '5m', '3h': '15m', '6h': '15m', '12h': '1h', '24h': '1h', '7d': '6h', '30d': '1d' }[range] || '1h'
     const [rTs, rClients, rDomains, rQtypes, rTotal, rUnique] = await Promise.allSettled([
       api.timeseries(range, bucket),
       api.topClients(range, 8),
