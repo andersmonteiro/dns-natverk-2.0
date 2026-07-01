@@ -1,9 +1,19 @@
 """
 Coletor do querylog do BIND9.
 Faz tail do arquivo de log e insere eventos no SQLite em batch.
-Detecta rotação de log via inode para não perder eventos após o BIND rotacionar o arquivo.
+
+Comportamento na inicialização:
+  - Lê o arquivo desde o início (histórico retroativo)
+  - Usa o timestamp do próprio log (não o horário atual) para manter precisão
+  - Pula entradas já existentes no banco (ts <= max_ts_no_banco)
+  - Após alcançar o fim do arquivo, passa para modo tail contínuo
+
+Rotação de log:
+  - Detecta rotação por mudança de inode
+  - Reabre automaticamente o novo arquivo sem perder eventos
 """
 import asyncio
+import datetime
 import os
 import re
 import time
@@ -21,9 +31,17 @@ LINE_RE = re.compile(
     r"\((?P<qname>[^)]+)\): query: \S+ IN (?P<qtype>\w+)"
 )
 
+# Timestamp no início da linha: DD-Mon-YYYY HH:MM:SS
+TS_RE = re.compile(r"^(\d{2}-[A-Za-z]{3}-\d{4} \d{2}:\d{2}:\d{2})")
+
+# Brasil sempre UTC-3 (sem horário de verão desde 2019)
+_BRT = datetime.timezone(datetime.timedelta(hours=-3))
+
 BATCH_SIZE = 500
 FLUSH_INTERVAL = 2.0   # segundos
 BUFFER_MAX = 50_000
+# Yield ao event loop a cada N linhas durante o catch-up para não bloquear
+CATCHUP_YIELD_EVERY = 2000
 
 _buffer: deque = deque(maxlen=BUFFER_MAX)
 _stats = {
@@ -37,6 +55,21 @@ _stats = {
 
 def get_stats() -> dict:
     return {**_stats, "buffer_size": len(_buffer)}
+
+
+def _parse_line_ts(line: str) -> int:
+    """
+    Extrai o timestamp do início da linha do log BIND e converte para Unix (UTC).
+    Fallback para time.time() se não conseguir parsear.
+    """
+    m = TS_RE.match(line)
+    if m:
+        try:
+            dt = datetime.datetime.strptime(m.group(1), "%d-%b-%Y %H:%M:%S")
+            return int(dt.replace(tzinfo=_BRT).timestamp())
+        except ValueError:
+            pass
+    return int(time.time())
 
 
 async def _flush(db: aiosqlite.Connection):
@@ -61,6 +94,13 @@ def _open_log(log_path: Path):
     return f, inode
 
 
+async def _get_max_ts(db: aiosqlite.Connection) -> int:
+    """Retorna o maior timestamp já gravado no banco (0 se vazio)."""
+    cur = await db.execute("SELECT MAX(ts) FROM dns_query")
+    row = await cur.fetchone()
+    return row[0] or 0
+
+
 async def collect_forever():
     _stats["running"] = True
     log_path = Path(settings.bind_log_path)
@@ -72,10 +112,13 @@ async def collect_forever():
         await db.execute("PRAGMA journal_mode=WAL")
         await db.execute("PRAGMA synchronous=NORMAL")
 
-        # Abre no final do arquivo (não reprocessa histórico)
+        # Pega o último timestamp gravado para evitar duplicatas no catch-up
+        max_ts = await _get_max_ts(db)
+
         f, current_inode = _open_log(log_path)
-        f.seek(0, 2)
+        # Lê desde o início — histórico retroativo
         last_flush = time.monotonic()
+        lines_since_yield = 0
 
         try:
             while True:
@@ -83,14 +126,31 @@ async def collect_forever():
                 if line:
                     m = LINE_RE.search(line)
                     if m:
-                        _buffer.append((
-                            int(time.time()),
-                            m.group("ip"),
-                            m.group("qname").lower(),
-                            m.group("qtype").upper(),
-                        ))
-                        _stats["events_total"] += 1
+                        ts = _parse_line_ts(line)
+                        if ts > max_ts:  # Pula o que já está no banco
+                            _buffer.append((
+                                ts,
+                                m.group("ip"),
+                                m.group("qname").lower(),
+                                m.group("qtype").upper(),
+                            ))
+                            _stats["events_total"] += 1
+
+                    # Yield periódico durante catch-up para não bloquear o event loop
+                    lines_since_yield += 1
+                    if lines_since_yield >= CATCHUP_YIELD_EVERY:
+                        lines_since_yield = 0
+                        if time.monotonic() - last_flush >= FLUSH_INTERVAL:
+                            try:
+                                await _flush(db)
+                            except Exception:
+                                pass
+                            last_flush = time.monotonic()
+                        await asyncio.sleep(0)
                 else:
+                    # Fim do arquivo — modo tail
+                    lines_since_yield = 0
+
                     # Detecta rotação de log: compara inode do arquivo atual com o aberto
                     try:
                         new_inode = os.stat(log_path).st_ino
@@ -98,7 +158,7 @@ async def collect_forever():
                             # BIND rotacionou o log — reabre do início do novo arquivo
                             f.close()
                             f, current_inode = _open_log(log_path)
-                            # Não faz seek(0,2): lê desde o início para não perder queries
+                            max_ts = 0  # Novo arquivo: sem histórico a pular
                     except FileNotFoundError:
                         pass  # Arquivo temporariamente ausente durante rotação
 
