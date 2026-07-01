@@ -101,6 +101,59 @@ async def _get_max_ts(db: aiosqlite.Connection) -> int:
     return row[0] or 0
 
 
+def _rotated_log_files(log_path: Path) -> list[Path]:
+    """
+    Retorna as versões rotacionadas do log em ordem cronológica (mais antigo primeiro).
+    BIND cria queries.log.0 (mais recente) ... queries.log.N (mais antigo).
+    Ex: /var/log/named/queries.log → queries.log.0, queries.log.1, ...
+    """
+    rotated = []
+    for i in range(10):  # BIND mantém até 5 por padrão, verificamos até 10
+        p = Path(f"{log_path}.{i}")
+        if p.exists():
+            rotated.append(p)
+    # rotated[0] = queries.log.0 (mais recente), reverter para ler do mais antigo primeiro
+    return list(reversed(rotated))
+
+
+async def _read_file_into_buffer(f, max_ts: int, db: aiosqlite.Connection) -> int:
+    """
+    Lê um arquivo de log completo, insere no buffer (e faz flush periódico).
+    Retorna o maior ts encontrado no arquivo.
+    """
+    lines_read = 0
+    local_max_ts = max_ts
+    last_flush = time.monotonic()
+
+    for line in f:
+        m = LINE_RE.search(line)
+        if m:
+            ts = _parse_line_ts(line)
+            if ts > max_ts:
+                _buffer.append((ts, m.group("ip"), m.group("qname").lower(), m.group("qtype").upper()))
+                _stats["events_total"] += 1
+                if ts > local_max_ts:
+                    local_max_ts = ts
+
+        lines_read += 1
+        if lines_read % CATCHUP_YIELD_EVERY == 0:
+            if time.monotonic() - last_flush >= FLUSH_INTERVAL:
+                try:
+                    await _flush(db)
+                except Exception:
+                    pass
+                last_flush = time.monotonic()
+            await asyncio.sleep(0)
+
+    # Flush final do arquivo
+    try:
+        await _flush(db)
+    except Exception:
+        pass
+
+    return local_max_ts
+
+
 async def collect_forever():
     _stats["running"] = True
     log_path = Path(settings.bind_log_path)
@@ -115,8 +168,13 @@ async def collect_forever():
         # Pega o último timestamp gravado para evitar duplicatas no catch-up
         max_ts = await _get_max_ts(db)
 
+        # ── Fase 1: catch-up dos arquivos rotacionados (mais antigo → mais recente) ──
+        for rotated in _rotated_log_files(log_path):
+            with open(rotated, "r", errors="replace") as rf:
+                max_ts = await _read_file_into_buffer(rf, max_ts, db)
+
+        # ── Fase 2: lê o arquivo atual desde o início ──
         f, current_inode = _open_log(log_path)
-        # Lê desde o início — histórico retroativo
         last_flush = time.monotonic()
         lines_since_yield = 0
 
